@@ -1,0 +1,21 @@
+runtime: python27
+api_version: 1
+threadsafe: true
+
+env_variables:
+  GAE_USE_SUBPROCESS: 0
+libraries:
+- name: numpy
+  version: "1.6.1"   
+handlers:
+- url: /js
+  static_dir: js  
+
+- url: /css
+  static_dir: css  
+  
+- url: /img
+  static_dir: img  
+
+- url: /.*
+  script: main.application

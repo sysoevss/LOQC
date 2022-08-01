@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>LOQC.TECH</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Linear Optics Quantum Computer Simulator">
+    <meta name="author" content="Sergey Sysoev">
+
+    <link href="/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/css/main_new.css" rel="stylesheet">
+    <link href="/css/jquery-ui.css" rel="stylesheet">
+    <link href="/css/jquery-comments.css" rel="stylesheet">
+
+    <link rel="stylesheet" type="text/css"
+          href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
+
+	<style>
+		/* Tooltip container */
+		.mytooltip {
+  			position: relative;
+  			display: inline-block;
+  			border-bottom: 1px dotted black; /* If you want dots under the hoverable text */
+		}
+
+		/* Tooltip text */
+		.mytooltip .mytooltiptext {
+  			visibility: hidden;
+  			width: 320px;
+  			background-color: black;
+  			color: #fff;
+  			text-align: center;
+  			padding: 5px 0;
+  			border-radius: 6px;
+ 
+	  		position: absolute;
+  			z-index: 1;
+		}
+
+		/* Show the tooltip text when you mouse over the tooltip container */
+		.mytooltip:hover .mytooltiptext {
+  			visibility: visible;
+		}
+        
+		.dropdown {
+		    position: relative;
+		    display: inline-block;
+		}
+		.dropdown-content {
+		    display: none;
+		    position: absolute;
+		    background-color: #f1f1f1;
+		    min-width: 160px;
+		    box-shadow: 0px 8px 16px 0px rgba(0, 0, 0, 0.2);
+		    z-index: 1;
+		}
+		.dropdown-content a {
+		    color: black;
+		    padding: 12px 16px;
+		    text-decoration: none;
+		    display: block;
+		}
+		.dropdown-content a:hover {background-color: #ddd; }
+		.show {display: block; }
+
+    </style>
+
+	<script type="text/javascript" src="/js/jquery-1.8.2.min.js"></script>  
+	<script type="text/javascript" src="/js/jquery.form.min.js"></script>
+	<script type="text/javascript" src="/js/jquery-ui.min.js"></script>
+    <script type="text/javascript" src="/js/jquery.limitText.js"></script>
+	<script type="text/javascript" src="/js/project_new.js"></script> 
+	<script type="text/javascript" src='/js/pdfmake.min.js'></script>	
+ 	<script type="text/javascript" src='/js/vfs_fonts.js'></script>	
+	<script type="text/javascript" src="/js/editable_table.js"></script>     
+    <script type="text/javascript" src="/js/chart.min.js"></script>
+    
+    <script src="/js/draw2d.js"></script>
+    <script id="MathJax-script" async
+          src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    
+  </head>
+
+  <body>
+	<div id="all_content" style="display:none;padding-right: 2px;padding-left: 2px;">
+	<!-- NAVBAR -->
+    <div class="navbar navbar-inverse navbar-fixed-top">
+      <div class="navbar-inner">
+        <div class="container-fluid" id="nav_container">
+          <a class="brand" href="#" style="color:#0088cc">LOQC.TECH</a>
+          <div class="nav-collapse collapse">
+            <ul class="nav">
+              <li class="active"><a href="#" id="composer">LO Composer</a></li>
+              <!--<li><a href="#" id="oneway">One-Way QC</a></li>-->
+            </ul>
+          </div>
+          <a class="brand" style="position:absolute; right: 135px; opacity: 0.7;" target="_blank" href="https://www.youtube.com/playlist?list=PLoyVdGlG0wfthpwltJ5fjwStZBOhBxrtO" id="manuals">Manuals</a>
+          <a class="brand" style="position:absolute; right: 35px; opacity: 0.7;" href="/logout" >Logout</a>
+        </div>
+      </div>
+    </div>
+
+	<!-- The main container -->
+
+    <div >
+			<!-- Linear Optics Composer TAB -->
+			<div id="composer_container" class="inner">
+                <table class="newspaper-a">
+                    <tr class="success">
+                        <td id="myprojects" style="width:120px;" class="loqc_menu loqc_menu_selected">My Projects</td>
+                        <td id="library" style="width:120px;" class="loqc_menu">Library</td>
+                        <td >&nbsp;</td>
+                    </tr>
+                </table>
+                <div id="myprojects_div" style="width:100%;">
+                    <table style="width:100%;"><tr>
+                        <td style="vertical-align: top; width:15%;">
+                            <table class="newspaper-a" id="table_myprojects_envelope" style="width:100%;">
+                            <tr>
+                                <td>
+                                    <b>Name</b><input type="text" class="input-block-level" id="new_element_table_myprojects" value="" style="min-height:15px;width:98%"/>
+                                    <b>Description</b><br/><textarea class="input-xxlarge" id="new_element_description_table_myprojects" rows="3" style="width:95%;"></textarea><br/>
+                                    <a class="loqc_button" href="#" id='create_button_table_myprojects'>Create Project</a>
+                                    <a class="loqc_button" href="#" id='update_button_table_myprojects' style="display:none;">Update</a>
+                                    <a class="loqc_button" href="#" id='cancel_button_table_myprojects' style="display:none;">Cancel</a>
+                                    <span id="temp_table_myprojects" style="display:none;"></span>
+                                </td>
+                            </tr>
+                            <tr><td colspan="5">
+                                <table id="table_myprojects" class="newspaper-a">
+                                    <tbody style="display: block; overflow-y: auto; max-height: 500px;"></tbody>
+                                </table>
+                            </td></tr>
+                            </table> 
+                        </td>
+                        <td style="vertical-align: top;">
+                            <a class="top_menu" href="#" id='details_tab'>Details</a>
+                            <a class="top_menu" href="#" id='simulate_tab'>Simulate</a>
+                            <a class="top_menu" href="#" id='matrix_tab'>Matrix</a>
+                            <a class="top_menu" href="#" id='fidelity_tab'>Fidelity</a>
+                            <table class="newspaper-a" id="lo_designer" style="width:100%;height:100%;">
+                                <tr><td style="width:99%;height:calc(100vh - 110px);background: linear-gradient(-0deg, #999, #bbb);padding: 0px 0px 0px 0px;">
+                                    <iframe id="lo_design_frame" src="/lo_designer/?id=0" width="100%" height="100%" ></iframe>
+                                 </td>                                 
+                                 </tr>
+                            </table>
+                           
+                        </td>
+                        <td style="vertical-align: top; width:35%;display:none;" id="simulate_tab_container" class="top_menu_container">
+                            <div style="margin: 10px 10px 10px 10px; color:#fff;">
+                                <h3> Simulation </h3>
+                                <a class="loqc_button_bright" href="#" id='simulate' style="display:none;">Simulate!</a> <br/> &nbsp; <br/>
+                                <div id="latex_res" style="display:none;background-color:#fff; font-size:14px; color:#000;width:100%;height:100%;min-height:100px;word-wrap: break-word;padding: 4px 4px 4px 4px;"></div>
+                                <br/><a class="loqc_button_bright" href="#" id='simulate_x' style="display:none;">Simulate X-basis!</a> <br/> &nbsp; <br/>
+                                <div id="latex_res_x" style="display:none;background-color:#fff; font-size:14px; color:#000;width:100%;height:100%;min-height:100px;word-wrap: break-word;padding: 4px 4px 4px 4px;"></div>
+                                <br/><a class="loqc_button_bright" href="#" id='simulate_y' style="display:none;">Simulate Y-basis!</a> <br/> &nbsp; <br/>
+                                <div id="latex_res_y" style="display:none;background-color:#fff; font-size:14px; color:#000;width:100%;height:100%;min-height:100px;word-wrap: break-word;padding: 4px 4px 4px 4px;"></div>
+                                <br/><a class="loqc_button_bright" href="#" id='simulate_z' style="display:none;">Simulate Z-basis!</a> <br/> &nbsp; <br/>
+                                <div id="latex_res_z" style="display:none;background-color:#fff; font-size:14px; color:#000;width:100%;height:100%;min-height:100px;word-wrap: break-word;padding: 4px 4px 4px 4px;"></div>
+                            </div>
+                        </td>
+                        <td style="vertical-align: top; width:35%;display:none;" id="details_tab_container" class="top_menu_container">
+                            <div style="margin: 10px 10px 10px 10px; color:#fff;">
+                                <h3> <span id="current_project_name"></span> Details </h3>
+                                <p> Project ID: <span id="current_project_key"></span> </p>
+                                <p> <span id="current_project_description"></span> </p>
+                            </div>
+                        </td>
+                        <td style="vertical-align: top; width:35%;display:none;" id="matrix_tab_container" class="top_menu_container">
+                            <div style="margin: 10px 10px 10px 10px; color:#fff;">
+                                <h3> Matrix </h3>
+                                <a class="loqc_button_bright" href="#" id='matrix_refresh' style="display:none;">Refresh</a> <br/> &nbsp; <br/>
+                                <div 
+                                    id="matrix_res" 
+                                    style="display:none;background-color:#fff; font-size:14px; color:#000;width:100%;height:100%;min-height:200px;word-wrap: break-word;padding: 4px 4px 4px 4px;">
+                                </div>
+                            </div>
+                        </td>
+                        <td style="vertical-align: top; width:35%;display:none;" id="fidelity_tab_container" class="top_menu_container">
+                            <div style="margin: 10px 10px 10px 10px; color:#fff;">
+                                <h3> Probability and Fidelity </h3>
+                                <a class="loqc_button_bright" href="#" id='fidelity_refresh' style="display:none;">Refresh</a> <br/> &nbsp; <br/>
+                                <div 
+                                    id="fidelity_res" 
+                                    style="display:none;font-size:14px; width:100%;height:100%;min-height:100px;word-wrap: break-word;padding: 4px 4px 4px 4px;">
+                                </div>
+                                <br/><br/>
+                                <table id="charts" style="display:none;">                                    
+                                    <tbody>
+                                        <tr><td>Probabilities</td></tr>
+                                        <tr><td><canvas id="probChart" height="300px" width="500px"></canvas></td></tr>
+                                        <tr><td>Infidelities (log10)</td></tr>
+                                        <tr><td><canvas id="fidChart" height="300px" width="500px"></canvas></td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </td>
+                    </tr></table>
+                    <!--<div style="display:none;" id="current_project_key"></div>-->
+                </div>
+                <div id="library_div" style="display:none;">
+                    <table style="width:100%;"><tr>
+                        <td style="vertical-align: top; width:25%;">
+                                <div style="padding:5px;"><a class="loqc_button_bright" style="width:50%;" href="#" onclick="refresh_lib();">Refresh</a></div>
+                                <table id="table_lib_projects" class="newspaper-a"  style="width:100%;">
+                                    <thead><tr><th>Name</th><th>Description</th><th>Author</th></tr></thead>
+                                    <tbody style="overflow-y: auto; max-height: 90vh;">
+                                    </tbody>
+                                </table>
+                        </td>
+                        <td style="vertical-align: top;">
+                            <div id="lib_project_key" style="display:none;"></div>
+                            <div id="lib_project_name" class="psa_text" style="padding:20px;"></div>
+                            <div id="lib_project_description" style="padding:20px;font-size: 15px; color: #fff;"></div>
+                            <div id="lib_pic_container" style='background-color:#fff;padding:50px;display:none;'><img src="" id="project_picture" style="height:70%;"></img></div>                            
+                            <div style="padding:20px;"><a class="loqc_button_bright" href="#" id='copy' style="display:none;">Copy to my Projects!</a></div>
+                        </td>
+                    </tr></table>
+                </div>
+            </div>
+
+			<!-- One-Way Qauntum Computing TAB -->
+			<div id="oneway_container" class="inner" style="display:none;padding:0px 0px 0px 0px;">
+                <img src="/img/coming_soon1.jpg"/>
+			</div>
+				
+	</div> <!-- /container -->
+
+    <!--
+		<div style="position:absolute; bottom: 5px; padding: 7px 17px 7px 17px;">
+			<small>&copy; Copyright 2022. <a href="https://www.petroms.ru">PetroMS</a></small>
+		</div>
+    -->
+    <!-- Le javascript
+    ================================================== -->
+    <!-- Placed at the end of the document so the pages load faster -->
+	</div>
+<script>
+window.onclick = function(event) {
+    if (!event.target.matches('.dropbtn')) {
+	$('.dropdown-content').removeClass('show');
+    }
+}
+</script>    
+  </body>
+</html>

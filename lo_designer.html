@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Linear Optics Designer">
+    <meta name="author" content="Sergey Sysoev">
+
+<style>
+a.loqc_button:link, a.loqc_button:visited {
+  background-color: rgba(0, 100, 180, 0.7);
+  color: white;
+  padding: 6px 25px;
+  margin: 1px 1px 1px 1px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  width: 120px;
+}
+
+a.loqc_button:hover, a.loqc_button:active {
+  background-color: rgba(0, 100, 180, 0.5);
+}
+a.loqc_button_2:link, a.loqc_button_2:visited {
+  background-color: rgba(0, 140, 160, 0.7);
+  color: white;
+  padding: 7px 25px;
+  margin: 1px 1px 1px 1px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  width: 120px;
+}
+
+a.loqc_button_2:hover, a.loqc_button_2:active {
+  background-color: rgba(0, 140, 160, 0.5);
+}
+
+body {	
+    background-image: url("/img/lined_paper.jpg");
+    background-repeat: no-repeat;
+    background-size: cover;    
+    height: 100%;   
+    background-color: #000;            
+}
+.tooltip {
+  position: relative;
+  display: inline-block;
+  border-bottom: 1px dotted black;
+}
+
+.tooltip .tooltiptext {
+  visibility: hidden;
+  width: 120px;
+  background-color: black;
+  color: #fff;
+  text-align: center;
+  border-radius: 6px;
+  padding: 5px 0;
+
+  /* Position the tooltip */
+  position: absolute;
+  z-index: 1;
+}
+
+.tooltip:hover .tooltiptext {
+  visibility: visible;
+}		
+</style>    
+    
+	<script type="text/javascript" src="/js/jquery-1.8.2.min.js"></script>  
+	<script type="text/javascript" src="/js/jquery.form.min.js"></script>
+	<script type="text/javascript" src="/js/jquery-ui.min.js"></script>
+	<script type="text/javascript" src='/js/pdfmake.min.js'></script>	
+    
+    <script src="/js/draw2d.js"></script>
+<script type="text/javascript">
+
+var canvas;
+var cur_figure;
+
+// Function to download data to a file
+// Thanks to: https://stackoverflow.com/questions/13405129/create-and-save-a-file-with-javascript
+//
+function download(data, filename) {
+    var file = new Blob([data], {type: 'text/plain'});
+    if (window.navigator.msSaveOrOpenBlob) // IE10+
+        window.navigator.msSaveOrOpenBlob(file, filename);
+    else { // Others
+        var a = document.createElement("a"),
+                url = URL.createObjectURL(file);
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(function() {
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);  
+        }, 0); 
+    }
+}
+
+// Thanks to https://stackoverflow.com/questions/1349404/generate-random-string-characters-in-javascript
+function makeid(length) {
+    var result           = '';
+    var characters       = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    var charactersLength = characters.length;
+    for ( var i = 0; i < length; i++ ) {
+      result += characters.charAt(Math.floor(Math.random() * charactersLength));
+   }
+   return result;
+}
+
+var show_port = function(){this.setVisible(true);};
+var hide_port = function(){this.setVisible(false);};
+
+InputFigure = draw2d.shape.basic.Polygon.extend({
+
+    init : function(attr)
+    {
+        this._super($.extend({bgColor:{red: 100, green: 170, blue: 255, alpha: 0.5},color:"#1B1B1B"},attr));
+        
+        this.resetVertices();
+        
+        var box = this.getBoundingBox();
+        
+        this.addVertex(0, 0);     
+        this.addVertex(box.w, box.h/2); 
+        this.addVertex(0, box.h);       
+
+        this.installEditPolicy(new draw2d.policy.figure.RectangleSelectionFeedbackPolicy());
+
+        this.setPosition(box.getTopLeft());
+    }
+
+});
+OutputFigure = draw2d.shape.basic.Polygon.extend({
+
+    init : function(attr)
+    {
+        this._super($.extend({bgColor:{red: 100, green: 170, blue: 255, alpha: 0.5},color:"#1B1B1B"},attr));
+        
+        this.resetVertices();
+        
+        var box = this.getBoundingBox();
+        
+        this.addVertex(0, box.h/2);     
+        this.addVertex(box.w, 0); 
+        this.addVertex(box.w, box.h);       
+
+        this.installEditPolicy(new draw2d.policy.figure.RectangleSelectionFeedbackPolicy());
+
+        this.setPosition(box.getTopLeft());
+    }
+
+});
+
+document.addEventListener("DOMContentLoaded",function () {
+
+    canvas = new draw2d.Canvas("gfx_holder");
+
+    // add a very simple CnavasPolicy just to catch the onClick method
+     //
+     canvas.installEditPolicy( new draw2d.policy.canvas.CanvasPolicy({
+        onClick: function(figure){
+            cur_figure = null;
+            if(figure!=null) {
+                var fig;
+                var figure_types = ["BS", "PS", "IN", "OUT"];
+                if (figure_types.includes(figure["type"])) {
+                    fig = figure;                  
+                } else {
+                    if (figure.parent) {
+                        if (figure_types.includes(figure.parent["type"]))
+                            fig = figure.parent;
+                    }
+                }
+                
+                if (fig) {
+                    cur_figure = fig;
+                    $("#controls").show();
+                    if (fig["type"] == "BS") {
+                        $("#theta_input").val(parseFloat(fig["theta"]));
+                        $("#theta").show();
+                    } else {
+                        $("#theta").hide();
+                    }
+                    if (fig["type"] == "BS" || fig["type"] == "PS") {
+                        $("#phi_input").val(parseFloat(fig["phi"]));
+                        $("#phi").show();
+                    } else {
+                        $("#phi").hide();
+                    }
+                    if (fig["type"] == "IN" || fig["type"] == "OUT") {
+                        if (fig["N"] == -1) {
+                            $("#n_input").val("");
+                        } else {
+                            $("#n_input").val(parseInt(fig["N"]));
+                        }
+                        $("#n").show();
+                    } else {
+                        $("#n").hide();
+                    }
+                } else {
+                    $("#controls").hide();
+                    cur_figure = null;
+                }
+            }                
+        }
+     }));
+     canvas.on("unselect", function(emitter,event){
+         $("#controls").hide();
+         cur_figure = null;
+     });     
+    // Override the default connection type. This is used during drag&drop operations of ports.
+    //
+    var createConnection=function(sourcePort, targetPort){
+       // return my special kind of connection
+       var con = new draw2d.Connection();
+       con.setRouter(new draw2d.layout.connection.ManhattanConnectionRouter());
+       return con;
+    };
+
+    // Install a special policy into the canvas to use my own implementation of connection
+    // if we drag&drop a port
+    //
+    canvas.installEditPolicy(  new draw2d.policy.connection.DragConnectionCreatePolicy({
+          createConnection: createConnection
+    }));
+    var MyInputPortLocatorTop = draw2d.layout.locator.PortLocator.extend({
+        init:function( ){
+          this._super();
+        },
+        relocate:function(index, figure){
+            this.applyConsiderRotation(figure, 10, 0);
+        }
+    });
+    var MyInputPortLocatorBottom = draw2d.layout.locator.PortLocator.extend({
+        init:function( ){
+          this._super();
+        },
+        relocate:function(index, figure){
+            var p = figure.getParent();
+            this.applyConsiderRotation(figure, 10, p.getHeight());
+        }
+    });
+
+    var MyOutputPortLocatorTop = draw2d.layout.locator.PortLocator.extend({
+        init:function( ){
+          this._super();
+        },
+        relocate:function(index, figure){
+            var p = figure.getParent();
+
+            this.applyConsiderRotation(figure, p.getWidth() - 10, 0);
+        }
+    });
+    var MyOutputPortLocatorBottom = draw2d.layout.locator.PortLocator.extend({
+        init:function( ){
+          this._super();
+        },
+        relocate:function(index, figure){
+            var p = figure.getParent();
+
+            this.applyConsiderRotation(figure, p.getWidth() - 10, p.getHeight());
+        }
+    });
+    
+    function add_bs(x, y, theta, phi, id) {
+        var d = new draw2d.shape.basic.Rectangle({width:60, height:60, x:x, y:y});
+        d.setBackgroundColor({red: 200, green: 200, blue: 250, alpha: 0.5})
+        d["type"] = "BS";
+        d["theta"] = theta;
+        d["phi"] = phi;
+        if (id) {
+            d["id"] = id;
+        }
+        d.label = new draw2d.shape.basic.Label({text:Number(theta).toFixed(1) + "\n" + Number(phi).toFixed(1), fontColor:"#0d0d0d", stroke:0});
+        d.add(d.label, new draw2d.layout.locator.CenterLocator(d));
+       
+        port1 = d.createPort("hybrid",new MyInputPortLocatorTop());
+        port2 = d.createPort("hybrid",new MyOutputPortLocatorTop());
+        port3 = d.createPort("hybrid",new MyInputPortLocatorBottom());
+        port4 = d.createPort("hybrid",new MyOutputPortLocatorBottom());
+        port1.on("connect", hide_port, port1);
+        port1.on("disconnect", show_port, port1);
+        port2.on("connect", hide_port, port2);
+        port2.on("disconnect", show_port, port2);
+        port3.on("connect", hide_port, port3);
+        port3.on("disconnect", show_port, port3);
+        port4.on("connect", hide_port, port4);
+        port4.on("disconnect", show_port, port4);
+
+        canvas.add( d);
+    }
+    $("#add_bs").click(function() {
+        add_bs(100, 100, 45.0, 0.0, null);
+    });
+
+    function add_ps(x, y, phi, id) {
+        var d = new draw2d.shape.basic.Rectangle({width:35, height:60, x:x, y:y});
+        d.setBackgroundColor({red: 200, green: 200, blue: 200, alpha: 0.5})
+        d["type"] = "PS";
+        d["phi"] = phi;
+        if (id) {
+            d["id"] = id;
+        }
+        d.label = new draw2d.shape.basic.Label({text:Number(phi).toFixed(1), fontColor:"#0d0d0d", stroke:0});
+        d.add(d.label, new draw2d.layout.locator.CenterLocator(d));
+        var inputLocator  = new draw2d.layout.locator.InputPortLocator({width:10, height:10});
+        var outputLocator = new draw2d.layout.locator.OutputPortLocator();
+
+        port1_in = d.createPort("hybrid",inputLocator);
+        port1_out = d.createPort("hybrid",outputLocator);
+        port1_in.on("connect", hide_port, port1_in);
+        port1_in.on("disconnect", show_port, port1_in);
+        port1_out.on("connect", hide_port, port1_out);
+        port1_out.on("disconnect", show_port, port1_out);
+
+        canvas.add( d);    
+    }
+    $("#add_ps").click(function() {
+        add_ps(100, 100, 180.0, null);
+    });
+    function add_input(x, y, N, id, input_type = 0) {
+        var d = new InputFigure({x: x, y:y, width:40, height:40});
+        if (input_type == 1) {
+            d.setBackgroundColor({red: 100, green: 100, blue: 100, alpha: 0.5});
+        }
+        if (input_type == 2) {
+            d.setBackgroundColor({red: 100, green: 250, blue: 100, alpha: 0.5});
+        }        
+        d["type"] = "IN";
+        d["N"] = N;
+        d["input_type"] = input_type;
+        if (id) {
+            d["id"] = id;
+        }
+        label_text = N;
+        if (N == -1) label_text = "-";
+        d.label = new draw2d.shape.basic.Label({text:label_text, fontColor:"#0d0d0d", stroke:0});
+        d.add(d.label, new draw2d.layout.locator.LeftLocator(d));
+        var outputLocator = new draw2d.layout.locator.OutputPortLocator();
+
+        port1_out = d.createPort("hybrid",outputLocator);
+        port1_out.on("connect", hide_port, port1_out);
+        port1_out.on("disconnect", show_port, port1_out);
+        canvas.add( d);    
+    }
+    $("#add_input").click(function() {
+        add_input(100, 100, "-", null, 0);
+    });   
+    $("#add_ancilla_input").click(function() {
+        add_input(100, 100, "-", null, 1);
+    });       
+    $("#add_control_input").click(function() {
+        add_input(100, 100, "-", null, 2);
+    });       
+    function add_output(x, y, N, id) {
+        var d = new OutputFigure({x: x, y:y, width:40, height:40});
+        d["type"] = "OUT";
+        d["N"] = N;
+        if (id) {
+            d["id"] = id;
+        }
+        label_text = N;
+        if (N == -1) label_text = "-";
+        d.label = new draw2d.shape.basic.Label({text:label_text, fontColor:"#0d0d0d", stroke:0});
+        if (N >= 0) {
+            d.setBackgroundColor({red: 100, green: 100, blue: 100, alpha: 0.5});
+        }
+        d.add(d.label, new draw2d.layout.locator.RightLocator(d));
+        var inputLocator = new draw2d.layout.locator.InputPortLocator();
+
+        port1_out = d.createPort("hybrid",inputLocator);
+        port1_out.on("connect", hide_port, port1_out);
+        port1_out.on("disconnect", show_port, port1_out);
+        
+        canvas.add( d);    
+    }
+    $("#add_output").click(function() {
+        add_output(100, 100, "-", null);
+    });       
+    function serialize_object(el, suffix = "") {
+        return {id: el.id + suffix, 
+                  type: el.type,
+                  theta: String(el.theta),
+                  phi: String(el.phi),
+                  n: String(el.N),
+                  input_type: String(el.input_type),
+                  x: el.x,
+                  y: el.y,
+                  project_key: el.project_key};
+    }
+    function serialize_connection(el, suffix = "") {
+        return [{
+                    type: "draw2d.Connection",
+                    id: el.id + suffix,
+                    alpha: 1,
+                    selectable: true,
+                    draggable: true,
+                    angle: 0,
+                    userData: {},
+                    cssClass: "draw2d_Connection",
+                    stroke: 2,
+                    color: "rgba(18,156,228,1)",
+                    outlineStroke: 0,
+                    outlineColor: "rgba(0,0,0,0)",
+                    policy: "draw2d.policy.line.VertexSelectionFeedbackPolicy",
+                    vertex: el.vertices.data,
+                    router: "draw2d.layout.connection.ManhattanConnectionRouter",
+                    radius: 3,
+                    source: {
+                        node: el.getSource().parent.id  + suffix,
+                        port: el.sourcePort.name
+                    },
+                    target: {
+                        "node": el.getTarget().parent.id + suffix,
+                        "port": el.targetPort.name
+                    }
+                }];
+    }    
+    $("#save").click(function() {
+        $.get('/clear_design/', {id: '{{ project_key }}' }, function(data) {
+            canvas.figures.data.forEach(el => {
+                $.post('/add_cycle_object/', {parent_key: '{{ project_key }}', object_type: "LODevice", 
+                    data: JSON.stringify(serialize_object(el)),}, function(data) {});
+            });           
+            canvas.lines.data.forEach(el => {
+                var line_json = JSON.stringify(serialize_connection(el));
+                $.post('/add_cycle_object/', {parent_key: '{{ project_key }}', object_type: "LOConnection", 
+                    data: JSON.stringify({line_json: line_json})}, function(data) {}
+                );            
+            });        
+        });
+    });
+    $("#export").click(function() {
+        exp_objects = [];
+        exp_connections = [];
+        random_suffix = makeid(16);
+        canvas.figures.data.forEach(el => {            
+            exp_objects.push(serialize_object(el, random_suffix));
+        });
+        canvas.lines.data.forEach(el => {
+            exp_connections.push(serialize_connection(el, random_suffix));
+        });  
+        data_to_save = JSON.stringify({objects: exp_objects, connections: exp_connections});
+        download(data_to_save, "loqc_tex_.txt");
+    });    
+    $("#import").click(function() {
+        // thanks to https://stackoverflow.com/questions/16215771/how-to-open-select-file-dialog-via-js
+        var input = document.createElement('input');
+        input.type = 'file';
+        input.onchange = e => { 
+           // getting a hold of the file reference
+           var file = e.target.files[0]; 
+           // setting up the reader
+           var reader = new FileReader();
+           reader.readAsText(file,'UTF-8');
+           // here we tell the reader what to do when it's done reading...
+           reader.onload = readerEvent => {
+                var content = readerEvent.target.result; // this is the content!
+                var reader_json = new draw2d.io.json.Reader();
+                data = JSON.parse(content);
+                data.objects.forEach(el => { load_object([0, el]) });
+                data.connections.forEach(el => {    
+                    reader_json.unmarshal(canvas, [el[0]]);
+                });
+            }
+        }
+        input.click();
+    });
+    $("#publish").click(function() {
+        PublushProject(canvas);
+    });
+    $("#set").click(function() {
+        if (cur_figure) {
+            if (cur_figure["type"] == "BS") {
+                theta = parseFloat($("#theta_input").val());
+                phi = parseFloat($("#phi_input").val());
+                cur_figure["theta"] = $("#theta_input").val();
+                cur_figure["phi"] = $("#phi_input").val();
+                cur_figure.label.text = Number((theta).toFixed(1)) + "\n" + Number((phi).toFixed(1));
+                cur_figure.label.repaint();
+                return;
+            }    
+            if (cur_figure["type"] == "PS") {
+                phi = parseFloat($("#phi_input").val());
+                cur_figure["phi"] = $("#phi_input").val();
+                cur_figure.label.text = Number((phi).toFixed(1));
+                cur_figure.label.repaint();
+                return;
+            }    
+            if (cur_figure["type"] == "IN" || cur_figure["type"] == "OUT") {
+                n_val = $("#n_input").val();
+                if (n_val) {
+                    n = parseInt(n_val);
+                    cur_figure["N"] = n_val;
+                    cur_figure.label.text = n;
+                } else {
+                    cur_figure["N"] = -1;
+                    cur_figure.label.text = "-";
+                }
+                cur_figure.label.repaint();
+                return;
+            }    
+        }
+    });
+    
+    function load_object(el) {
+        // figures
+        if (el[1].type == "BS") {
+            add_bs(el[1].x, el[1].y, el[1].theta, el[1].phi, el[1].id);
+        }
+        if (el[1].type == "PS") {
+            add_ps(el[1].x, el[1].y, el[1].phi, el[1].id);
+        }
+        if (el[1].type == "IN") {
+            add_input(el[1].x, el[1].y, el[1].n, el[1].id, el[1].input_type);
+        }
+        if (el[1].type == "OUT") {
+            add_output(el[1].x, el[1].y, el[1].n, el[1].id);
+        } 
+        if (el[1].type == "User Project") {
+            add_user_project(el[1].project_key, el[1].id, el[1].x, el[1].y);
+        }                
+    }
+    function load_design() {
+        user_projects_to_load = [];
+        // Project params
+        $.get('/get_object_by_key/', {object_type: "Project", key: '{{ project_key }}'}, function(json) {
+            data = JSON.parse(json);
+            if (data["published"]) {
+                $("#save").hide();
+                $("#publish").html("Unpublish");
+            } 
+		}); 
+        $.get('/cycle_objects/', {object_type: "LODevice", parent_key: '{{ project_key }}' }, function(json) {
+            data = JSON.parse(json);
+            data.forEach(el => {  load_object(el) });
+            
+            // lines
+            need_lines = true;
+            $(document).ajaxStop(function () {
+                if (!need_lines) return;
+                need_lines = false;
+                $.get('/cycle_objects/', {object_type: "LOConnection", parent_key: '{{ project_key }}' }, function(json) {                
+                    var reader = new draw2d.io.json.Reader();
+                    data = JSON.parse(json);
+                    data.forEach(el => {    
+                        reader.unmarshal(canvas, el[1]["line_json"]);
+                    });
+                });
+            });
+        });
+    }
+    load_design();
+});
+
+var need_lines = false;
+
+function PublushProject(canvas){
+    // convert the canvas into a PNG image source string 
+    //
+    var xCoords = [];
+    var yCoords = [];
+    canvas.getFigures().each(function(i,f){
+        var b = f.getBoundingBox();
+        xCoords.push(b.x, b.x+b.w);
+        yCoords.push(b.y, b.y+b.h);
+    });
+    var minX   = Math.min.apply(Math, xCoords);
+    var minY   = Math.min.apply(Math, yCoords);
+    var width  = Math.max.apply(Math, xCoords)-minX;
+    var height = Math.max.apply(Math, yCoords)-minY;
+    
+    var writer = new draw2d.io.png.Writer();
+    writer.marshal(canvas,function(png){
+        $.post('/publish_project/', {key: '{{ project_key }}', png: png}, function(data) {
+            alert(data);
+            location.reload();
+        });
+    }, new draw2d.geo.Rectangle(minX,minY,width,height));
+}
+function add_user_project(key, id, x, y) {
+    $.get('/cycle_objects/', {object_type: "LOCircuit", parent_key: key}, function(json) {
+        data = JSON.parse(json);
+        if (data.length == 0) {
+            alert("Can't use this circuit. You need to execute it separately first to build its matrix");
+            return;
+        }
+        modes = parseInt(data[0][1].modes);
+        if (modes > 0) {
+            var d = new draw2d.shape.basic.Rectangle({width:60, height: 30*modes, x:x, y:y});
+            d.setBackgroundColor({red: 200, green: 200, blue: 250, alpha: 0.5})
+            d["type"] = "User Project";
+            d["project_key"] = key;
+            if (id) {
+                d["id"] = id;
+            }
+            d.label = new draw2d.shape.basic.Label({text:data[0][1].name, fontColor:"#0d0d0d", stroke:0});
+            d.add(d.label, new draw2d.layout.locator.CenterLocator(d));
+        
+            for (i = 0; i < modes; i++) {
+                port1 = d.createPort("hybrid",new draw2d.layout.locator.InputPortLocator({width:10, height:10}));
+                port2 = d.createPort("hybrid",new draw2d.layout.locator.OutputPortLocator());
+                port1.on("connect", hide_port, port1);
+                port1.on("disconnect", show_port, port1);
+                port2.on("connect", hide_port, port2);
+                port2.on("disconnect", show_port, port2);
+            }
+            canvas.add(d);                        
+        } else {
+            alert("Can't use this circuit. You need to execute it separately first to build its matrix");
+        }
+    }); 
+}
+</script>    
+  </head>
+  <body>
+    <table><tr>
+        <td style="width:180px;vertical-align: top;">
+            <a class="loqc_button_2" href="#" id='save' >Save</a>
+            <a class="loqc_button_2" href="#" id='publish' >Publish</a>
+            <a class="loqc_button_2" href="#" id='export' >Export</a>
+            <a class="loqc_button_2" href="#" id='import' >Import</a>
+            <hr></hr>
+            <a class="loqc_button" href="#" id='add_bs' >Beam Splitter</a>
+            <a class="loqc_button" href="#" id='add_ps' >Phase Shifter</a>
+            <a class="loqc_button" href="#" id='add_input' >Input</a>
+            <a class="loqc_button" href="#" id='add_ancilla_input' >Ancilla Input</a>
+            <a class="loqc_button" href="#" id='add_control_input' >Control Input</a>
+            <a class="loqc_button tooltip" href="#" id='add_output' >SP Detection<span class="tooltiptext">Single photon detection</span></a>
+            <table id="controls" style="display:none;">
+                <tr id="theta"><td style="width:20px;"><b>&theta;</b></td><td><input type="number" id="theta_input" value="" style="min-height:15px;width:130px;"/></td></tr>
+                <tr id="phi"><td style="width:20px;"><b>&phi;</b></td><td><input type="number" id="phi_input" value="" style="min-height:15px;width:130px;"/></td></tr>
+                <tr id="n"><td style="width:20px;"><b>n</b></td><td><input type="number" id="n_input" value="" style="min-height:15px;width:130px;"/></td></tr>
+                <tr><td colspan="2"><a class="loqc_button_2" href="#" id='set' >Set</a></td></tr>                
+            </table>
+            <hr></hr>
+            {% for p in projects %}
+                <a class="loqc_button" href="#" onclick='add_user_project("{{p.key}}", null, 100, 100);' >{{p.name}}</a>
+            {% endfor %}
+        </td>
+        <td>
+            <div  onselectstart="javascript:/*IE8 hack*/return false" id="gfx_holder" style="width:2000px; height:2000px;display: block;"></div>
+        </td>
+    </tr></table>
+  </body>
+</html>
