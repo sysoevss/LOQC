@@ -158,6 +158,20 @@ OutputFigure = draw2d.shape.basic.Polygon.extend({
 document.addEventListener("DOMContentLoaded",function () {
 
     canvas = new draw2d.Canvas("gfx_holder");
+    
+    // this is to fix wrong coordinates on canvas scrolling
+    canvas.setScrollArea($('#gfx_holder'));
+    canvas.fromDocumentToCanvasCoordinate = $.proxy(function(x, y) {
+        return new draw2d.geo.Point(
+                (x - this.getAbsoluteX() + $(document).scrollLeft())*this.zoomFactor,
+                (y - this.getAbsoluteY() + $(document).scrollTop())*this.zoomFactor);
+    },canvas);
+    canvas.fromCanvasToDocumentCoordinate = $.proxy(function(x,y) {
+    return new draw2d.geo.Point(
+            ((x*(1/this.zoomFactor)) + this.getAbsoluteX() - $(document).scrollLeft()),
+            ((y*(1/this.zoomFactor)) + this.getAbsoluteY() - $(document).scrollTop()));
+    },canvas);    
+    
 
     // add a very simple CnavasPolicy just to catch the onClick method
      //
