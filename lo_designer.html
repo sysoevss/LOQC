@@ -348,6 +348,8 @@ document.addEventListener("DOMContentLoaded",function () {
     }
     $("#add_bs").click(function() {
         add_bs(100, 100, 45.0, 0.0, null);
+        $("#save").removeClass("loqc_button_2_inactive");
+        $("#save").addClass("loqc_button_alert");
     });
 
     function add_ps(x, y, phi, id) {
@@ -374,6 +376,8 @@ document.addEventListener("DOMContentLoaded",function () {
     }
     $("#add_ps").click(function() {
         add_ps(100, 100, 180.0, null);
+        $("#save").removeClass("loqc_button_2_inactive");
+        $("#save").addClass("loqc_button_alert");
     });
     function add_input(x, y, N, id, input_type = 0) {
         var d = new InputFigure({x: x, y:y, width:40, height:40});
@@ -402,12 +406,18 @@ document.addEventListener("DOMContentLoaded",function () {
     }
     $("#add_input").click(function() {
         add_input(100, 100, "-", null, 0);
+        $("#save").removeClass("loqc_button_2_inactive");
+        $("#save").addClass("loqc_button_alert");
     });   
     $("#add_ancilla_input").click(function() {
         add_input(100, 100, "-", null, 1);
+        $("#save").removeClass("loqc_button_2_inactive");
+        $("#save").addClass("loqc_button_alert");
     });       
     $("#add_control_input").click(function() {
         add_input(100, 100, "-", null, 2);
+        $("#save").removeClass("loqc_button_2_inactive");
+        $("#save").addClass("loqc_button_alert");
     });       
     function add_output(x, y, N, id) {
         var d = new OutputFigure({x: x, y:y, width:40, height:40});
@@ -433,6 +443,8 @@ document.addEventListener("DOMContentLoaded",function () {
     }
     $("#add_output").click(function() {
         add_output(100, 100, "-", null);
+        $("#save").removeClass("loqc_button_2_inactive");
+        $("#save").addClass("loqc_button_alert");
     });       
     function serialize_object(el, suffix = "") {
         return {id: el.id + suffix, 
