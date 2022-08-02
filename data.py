@@ -48,13 +48,13 @@ def PublishProject(project_key, png):
     if proj.published:
         proj.published = False
         proj.put()
-        return 'Project was successfully unpublished!'
+        return 'OK'
     if not GetCircuit(project_key):
         return 'Project is not ready. Simulate it first'
     proj.png = png
     proj.published = True
     proj.put()
-    return 'Project is published!'
+    return 'OK'
 
 def GetMatrices(project_key):
     proj = Project.get(project_key)

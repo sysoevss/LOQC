@@ -36,6 +36,37 @@ a.loqc_button_2:hover, a.loqc_button_2:active {
   background-color: rgba(0, 140, 160, 0.5);
 }
 
+a.loqc_button_2_inactive:link, a.loqc_button_2_inactive:visited {
+  background-color: rgba(0, 140, 160, 0.3);
+  color: white;
+  padding: 7px 25px;
+  margin: 1px 1px 1px 1px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  width: 120px;
+}
+
+a.loqc_button_2_inactive:hover, a.loqc_button_2_inactive:active {
+  background-color: rgba(0, 140, 160, 0.3);
+}
+
+a.loqc_button_alert:link, a.loqc_button_alert:visited {
+  background-color: rgba(255, 140, 60, 0.7);
+  color: white;
+  padding: 7px 25px;
+  margin: 1px 1px 1px 1px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  width: 120px;
+}
+
+a.loqc_button_alert:hover, a.loqc_button_alert:active {
+  background-color: rgba(255, 140, 60, 0.5);
+}
+
+
 body {	
     background-image: url("/img/lined_paper.jpg");
     background-repeat: no-repeat;
@@ -173,6 +204,13 @@ document.addEventListener("DOMContentLoaded",function () {
             ((y*(1/this.zoomFactor)) + this.getAbsoluteY() - $(document).scrollTop()));
     },canvas);    
     
+    // https://stackoverflow.com/questions/14883066/resize-listener-for-draw2d-touch
+    canvas.getCommandStack().addEventListener(function(e){
+        if(e.isPostChangeEvent()){
+            $("#save").removeClass("loqc_button_2_inactive");
+            $("#save").addClass("loqc_button_alert");
+        }
+    });    
 
     // add a very simple CnavasPolicy just to catch the onClick method
      //
@@ -446,7 +484,10 @@ document.addEventListener("DOMContentLoaded",function () {
                 $.post('/add_cycle_object/', {parent_key: '{{ project_key }}', object_type: "LOConnection", 
                     data: JSON.stringify({line_json: line_json})}, function(data) {}
                 );            
-            });        
+            }); 
+            $("#save").removeClass("loqc_button_alert");
+            $("#save").addClass("loqc_button_2_inactive");
+            $("#activate").click();            
         });
     });
     $("#export").click(function() {
@@ -461,6 +502,7 @@ document.addEventListener("DOMContentLoaded",function () {
         });  
         data_to_save = JSON.stringify({objects: exp_objects, connections: exp_connections});
         download(data_to_save, "loqc_tex_.txt");
+        $("#activate").click(); 
     });    
     $("#import").click(function() {
         // thanks to https://stackoverflow.com/questions/16215771/how-to-open-select-file-dialog-via-js
@@ -484,12 +526,18 @@ document.addEventListener("DOMContentLoaded",function () {
             }
         }
         input.click();
+        $("#activate").click(); 
     });
     $("#publish").click(function() {
         PublushProject(canvas);
+        $("#activate").click(); 
     });
     $("#set").click(function() {
+        $("#activate").click(); 
         if (cur_figure) {
+            $("#save").removeClass("loqc_button_2_inactive");
+            $("#save").addClass("loqc_button_alert");
+            
             if (cur_figure["type"] == "BS") {
                 theta = parseFloat($("#theta_input").val());
                 phi = parseFloat($("#phi_input").val());
@@ -519,8 +567,15 @@ document.addEventListener("DOMContentLoaded",function () {
                 cur_figure.label.repaint();
                 return;
             }    
-        }
+        }        
     });
+    
+    // For some reason after this iframe starts to accept keyboard events
+    $("#activate").click(function(e) {
+        e.preventDefault();
+        $("#activate").removeClass("loqc_button_2");
+        $("#activate").addClass("loqc_button_2_inactive");
+    });    
     
     function load_object(el) {
         // figures
@@ -592,8 +647,18 @@ function PublushProject(canvas){
     var writer = new draw2d.io.png.Writer();
     writer.marshal(canvas,function(png){
         $.post('/publish_project/', {key: '{{ project_key }}', png: png}, function(data) {
-            alert(data);
-            location.reload();
+            if (data != "OK") {
+                alert(data);
+            } else {
+                if ($("#publish").html() == "Unpublish") {
+                    $("#publish").html("Publish");
+                    $("#save").show();
+                } else {
+                    $("#publish").html("Unpublish");
+                    $("#save").hide();
+                }                
+                //location.reload();
+            }
         });
     }, new draw2d.geo.Rectangle(minX,minY,width,height));
 }
@@ -635,7 +700,8 @@ function add_user_project(key, id, x, y) {
   <body>
     <table><tr>
         <td style="width:180px;vertical-align: top;">
-            <a class="loqc_button_2" href="#" id='save' >Save</a>
+            <a class="loqc_button_2_inactive" href="#" id='save' >Save</a>
+            <a class="loqc_button_2 tooltip" href="#" id='activate'>Unlock<span class="tooltiptext">Unlock graph edit</span></a>
             <a class="loqc_button_2" href="#" id='publish' >Publish</a>
             <a class="loqc_button_2" href="#" id='export' >Export</a>
             <a class="loqc_button_2" href="#" id='import' >Import</a>
@@ -645,7 +711,7 @@ function add_user_project(key, id, x, y) {
             <a class="loqc_button" href="#" id='add_input' >Input</a>
             <a class="loqc_button" href="#" id='add_ancilla_input' >Ancilla Input</a>
             <a class="loqc_button" href="#" id='add_control_input' >Control Input</a>
-            <a class="loqc_button tooltip" href="#" id='add_output' >SP Detection<span class="tooltiptext">Single photon detection</span></a>
+            <a class="loqc_button tooltip" href="#" id='add_output' >Photon Detection<!--<span class="tooltiptext">Single photon detection</span>--></a>
             <table id="controls" style="display:none;">
                 <tr id="theta"><td style="width:20px;"><b>&theta;</b></td><td><input type="number" id="theta_input" value="" style="min-height:15px;width:130px;"/></td></tr>
                 <tr id="phi"><td style="width:20px;"><b>&phi;</b></td><td><input type="number" id="phi_input" value="" style="min-height:15px;width:130px;"/></td></tr>
