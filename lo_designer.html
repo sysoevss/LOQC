@@ -499,7 +499,7 @@ document.addEventListener("DOMContentLoaded",function () {
             }); 
             $("#save").removeClass("loqc_button_alert");
             $("#save").addClass("loqc_button_2_inactive");
-            $("#activate").click();            
+            //$("#activate").click();            
         });
     });
     $("#export").click(function() {
@@ -514,7 +514,7 @@ document.addEventListener("DOMContentLoaded",function () {
         });  
         data_to_save = JSON.stringify({objects: exp_objects, connections: exp_connections});
         download(data_to_save, "loqc_tex_.txt");
-        $("#activate").click(); 
+        //$("#activate").click(); 
     });    
     $("#import").click(function() {
         // thanks to https://stackoverflow.com/questions/16215771/how-to-open-select-file-dialog-via-js
@@ -538,14 +538,14 @@ document.addEventListener("DOMContentLoaded",function () {
             }
         }
         input.click();
-        $("#activate").click(); 
+        //$("#activate").click(); 
     });
     $("#publish").click(function() {
         PublushProject(canvas);
-        $("#activate").click(); 
+        //$("#activate").click(); 
     });
     $("#set").click(function() {
-        $("#activate").click(); 
+        //$("#activate").click(); 
         if (cur_figure) {
             $("#save").removeClass("loqc_button_2_inactive");
             $("#save").addClass("loqc_button_alert");
@@ -585,8 +585,8 @@ document.addEventListener("DOMContentLoaded",function () {
     // For some reason after this iframe starts to accept keyboard events
     $("#activate").click(function(e) {
         e.preventDefault();
-        $("#activate").removeClass("loqc_button_2");
-        $("#activate").addClass("loqc_button_2_inactive");
+        //$("#activate").removeClass("loqc_button_2");
+        //$("#activate").addClass("loqc_button_2_inactive");
     });    
     
     function load_object(el) {
@@ -713,7 +713,7 @@ function add_user_project(key, id, x, y) {
     <table><tr>
         <td style="width:180px;vertical-align: top;">
             <a class="loqc_button_2_inactive" href="#" id='save' >Save</a>
-            <a class="loqc_button_2 tooltip" href="#" id='activate'>Unlock<span class="tooltiptext">Unlock graph edit</span></a>
+            <a class="loqc_button_2 tooltip" href="#" id='activate'>Unlock<span class="tooltiptext">Press me when 'Delete' doesn't work!</span></a>
             <a class="loqc_button_2" href="#" id='publish' >Publish</a>
             <a class="loqc_button_2" href="#" id='export' >Export</a>
             <a class="loqc_button_2" href="#" id='import' >Import</a>
