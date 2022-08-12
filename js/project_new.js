@@ -408,4 +408,42 @@ function show_page_modal(url, title) {
     $dialog.dialog('open');
 }
 
-
+function confirmation_modal(question, handler, params = null) {    
+    // clean form
+    $("#confirmation_template").html(question);
+    
+    // dialog
+    var dialog = $('#confirmation_template').dialog({
+	width: 700,
+	autoOpen: false,
+	modal: true,
+    zIndex: 9998,
+    stack: false,
+	title: "Confirm action",
+	closeText: "X",
+	show: {
+	    effect: "blind",
+	    duration: 100
+	},
+	hide: {
+	    effect: "blind",
+	    duration: 100
+	},
+    buttons: {
+        "Confirm": function () {
+            if (params)
+                handler(params);
+            else
+                handler();
+            dialog.dialog( "close" );
+        },
+        "Cancel": function() {
+          dialog.dialog( "close" );
+        }
+    },    
+    close: function() {
+        
+    }    
+    });
+    dialog.dialog('open');
+}

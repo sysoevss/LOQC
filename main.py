@@ -80,7 +80,6 @@ class GetObjectByKey(webapp2.RequestHandler):
         object_type = self.request.get('object_type')
         key = self.request.get('key')
         self.response.out.write(data.GetObjectByKey(object_type, key))  
-# Not used for now        
 class DeleteCycleObject(webapp2.RequestHandler):
     def get(self):
         object_type = self.request.get('object_type')
@@ -162,6 +161,7 @@ application = webapp2.WSGIApplication([('/', MainPage),
                                        ('/cycle_objects/', CycleObjects),
                                        ('/get_object_by_key/', GetObjectByKey),
                                        ('/add_cycle_object/', AddCycleObject),
+                                       ('/delete_cycle_object/', DeleteCycleObject),
                                        ('/update_cycle_object/', EditCycleObject), 
                                        ('/lo_designer/', LODesigner),
                                        ('/clear_design/', ClearDesign),

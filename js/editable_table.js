@@ -1,6 +1,11 @@
 /*
     table must have: create_button, update_button, cancel_button, new_element text field, temp hidden field
 */
+function delete_handler(params) {
+    $.get('/delete_cycle_object/', { key: params.key, object_type: params.object_type }, function(data) {
+        update_table(params.table_id, params.object_type, params.fields, params.click_handler, params.parent_key, params.edit_preload, params.edit_presend);
+    });	
+}
 function update_table(table_id, object_type, fields, click_handler, parent_key, edit_preload = null, edit_presend = null) {
     $("#" + table_id + " tbody").empty();
 	$.get('/cycle_objects/', {object_type: object_type, parent_key: parent_key }, function(json) {
@@ -15,7 +20,8 @@ function update_table(table_id, object_type, fields, click_handler, parent_key, 
                 }
             });
             row_str += "<td>" 
-            row_str += "" + "<a id='" + el[0] + "_edit' class='btn-small btn-warning' href='#' title='Edit'><i class='icon-pencil'></i></a></td>"
+            row_str += "" + "<a id='" + el[0] + "_edit' class='btn-small btn-warning' href='#' title='Edit'><i class='icon-pencil'></i></a>"
+            row_str += "" + "<a id='" + el[0] + "_delete' class='btn-small btn-warning' href='#' title='Delete'><i class='icon-trash'></i></a></td>"
             row_str += "</tr>"
             $("#" + table_id + " tbody").append(row_str);
             // delete handler
@@ -24,9 +30,8 @@ function update_table(table_id, object_type, fields, click_handler, parent_key, 
                 e.preventDefault();
                 key = $(this).attr("id");
                 key = key.substring(0, key.length - 7);
-                $.get('/delete_cycle_object/', { key: key, object_type: object_type }, function(data) {
-                    update_table(table_id, object_type, fields, click_handler, parent_key, edit_preload, edit_presend);
-                });			  
+                params = {key: key, object_type: object_type, table_id: table_id, fields: fields, click_handler: click_handler, parent_key: parent_key, edit_preload: edit_preload, edit_presend: edit_presend}
+                confirmation_modal("Please confirm deletion", delete_handler, params = params);
             });
             // edit handler
             $("#" + el[0] + "_edit").click(function(e){

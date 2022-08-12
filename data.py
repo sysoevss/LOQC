@@ -176,7 +176,6 @@ def CycleObjects(object_type, parent_key):
     except Exception as ex:
         return str(ex)
 
-# NOT USED FOR NOW
 def DeleteCycleObject(key, object_type):
     try:
         if not CallCheck():
