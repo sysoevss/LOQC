@@ -200,6 +200,7 @@ label {
     padding: 3px 3px 3px 10px;
     vertical-align: top;
     color: #eee;
+    word-break: break-all;
 }
 
 
