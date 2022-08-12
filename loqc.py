@@ -24,13 +24,13 @@ def PS(phi, mode, dim):
     return res
 
 def run_circuit(input, matrix, dim):
-    # TODO: don't calculate a_i if it's not used
     for i in range(dim):
-        b_repr = "("
-        for j in range(dim):
-            b_repr += "+(" + str(matrix[i][j]) + ")*b" + str(j+1)
-        b_repr += ")"
-        input = input.replace("a" + str(i+1), b_repr)
+        if "a" + str(i+1) in input:
+            b_repr = "("
+            for j in range(dim):
+                b_repr += "+(" + str(matrix[i][j]) + ")*b" + str(j+1)
+            b_repr += ")"
+            input = input.replace("a" + str(i+1), b_repr)
     return expand(input)
 
 def use_result(input, mode, val):
@@ -361,9 +361,10 @@ def matrix_sqrt(a):
 def calc_fidelity(rho_out, rho):
     tr_rho = np.trace(rho)
     tr_out = np.trace(rho_out)
+    sqrt_rho = matrix_sqrt(rho)
     if tr_rho * tr_out == 0:
         return 0
-    return abs(np.trace(matrix_sqrt(reduce(np.dot, [matrix_sqrt(rho), rho_out, matrix_sqrt(rho)]))) ** 2 / (tr_rho * tr_out))
+    return abs(np.trace(matrix_sqrt(reduce(np.dot, [sqrt_rho, rho_out, sqrt_rho]))) ** 2 / (tr_rho * tr_out))
 
 def calc_rho(gate, state):
     cgate = np.identity(4, dtype = 'complex_')
