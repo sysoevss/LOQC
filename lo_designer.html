@@ -346,7 +346,8 @@ document.addEventListener("DOMContentLoaded",function () {
 
         canvas.add( d);
     }
-    $("#add_bs").click(function() {
+    $("#add_bs").click(function(e) {
+        e.preventDefault();
         add_bs(100, 100, 45.0, 0.0, null);
         $("#save").removeClass("loqc_button_2_inactive");
         $("#save").addClass("loqc_button_alert");
@@ -374,7 +375,8 @@ document.addEventListener("DOMContentLoaded",function () {
 
         canvas.add( d);    
     }
-    $("#add_ps").click(function() {
+    $("#add_ps").click(function(e) {
+        e.preventDefault();
         add_ps(100, 100, 180.0, null);
         $("#save").removeClass("loqc_button_2_inactive");
         $("#save").addClass("loqc_button_alert");
@@ -404,17 +406,20 @@ document.addEventListener("DOMContentLoaded",function () {
         port1_out.on("disconnect", show_port, port1_out);
         canvas.add( d);    
     }
-    $("#add_input").click(function() {
+    $("#add_input").click(function(e) {
+        e.preventDefault();
         add_input(100, 100, "-", null, 0);
         $("#save").removeClass("loqc_button_2_inactive");
         $("#save").addClass("loqc_button_alert");
     });   
-    $("#add_ancilla_input").click(function() {
+    $("#add_ancilla_input").click(function(e) {
+        e.preventDefault();
         add_input(100, 100, "-", null, 1);
         $("#save").removeClass("loqc_button_2_inactive");
         $("#save").addClass("loqc_button_alert");
     });       
-    $("#add_control_input").click(function() {
+    $("#add_control_input").click(function(e) {
+        e.preventDefault();
         add_input(100, 100, "-", null, 2);
         $("#save").removeClass("loqc_button_2_inactive");
         $("#save").addClass("loqc_button_alert");
@@ -441,7 +446,8 @@ document.addEventListener("DOMContentLoaded",function () {
         
         canvas.add( d);    
     }
-    $("#add_output").click(function() {
+    $("#add_output").click(function(e) {
+        e.preventDefault();
         add_output(100, 100, "-", null);
         $("#save").removeClass("loqc_button_2_inactive");
         $("#save").addClass("loqc_button_alert");
@@ -485,7 +491,8 @@ document.addEventListener("DOMContentLoaded",function () {
                     }
                 }];
     }    
-    $("#save").click(function() {
+    $("#save").click(function(e) {
+        e.preventDefault();
         $.get('/clear_design/', {id: '{{ project_key }}' }, function(data) {
             canvas.figures.data.forEach(el => {
                 $.post('/add_cycle_object/', {parent_key: '{{ project_key }}', object_type: "LODevice", 
@@ -502,7 +509,8 @@ document.addEventListener("DOMContentLoaded",function () {
             //$("#activate").click();            
         });
     });
-    $("#export").click(function() {
+    $("#export").click(function(e) {
+        e.preventDefault();
         exp_objects = [];
         exp_connections = [];
         random_suffix = makeid(16);
@@ -516,7 +524,8 @@ document.addEventListener("DOMContentLoaded",function () {
         download(data_to_save, "loqc_tex_.txt");
         //$("#activate").click(); 
     });    
-    $("#import").click(function() {
+    $("#import").click(function(e) {
+        e.preventDefault();
         // thanks to https://stackoverflow.com/questions/16215771/how-to-open-select-file-dialog-via-js
         var input = document.createElement('input');
         input.type = 'file';
@@ -540,11 +549,13 @@ document.addEventListener("DOMContentLoaded",function () {
         input.click();
         //$("#activate").click(); 
     });
-    $("#publish").click(function() {
+    $("#publish").click(function(e) {
+        e.preventDefault();
         PublushProject(canvas);
         //$("#activate").click(); 
     });
-    $("#set").click(function() {
+    $("#set").click(function(e) {
+        e.preventDefault();
         //$("#activate").click(); 
         if (cur_figure) {
             $("#save").removeClass("loqc_button_2_inactive");
@@ -732,7 +743,7 @@ function add_user_project(key, id, x, y) {
             </table>
             <hr></hr>
             {% for p in projects %}
-                <a class="loqc_button" href="#" onclick='add_user_project("{{p.key}}", null, 100, 100);' >{{p.name}}</a>
+                <a class="loqc_button" href="#" onclick='function(e) {e.preventDefault(); add_user_project("{{p.key}}", null, 100, 100);}' >{{p.name}}</a>
             {% endfor %}
         </td>
         <td>
