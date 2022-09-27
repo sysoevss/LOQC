@@ -712,7 +712,7 @@ function add_user_project(key, id, x, y) {
                 port2.on("connect", hide_port, port2);
                 port2.on("disconnect", show_port, port2);
             }
-            canvas.add(d);                        
+            canvas.add(d);    
         } else {
             alert("Can't use this circuit. You need to execute it separately first to build its matrix");
         }
@@ -743,7 +743,7 @@ function add_user_project(key, id, x, y) {
             </table>
             <hr></hr>
             {% for p in projects %}
-                <a class="loqc_button" href="#" onclick='function(e) {e.preventDefault(); add_user_project("{{p.key}}", null, 100, 100);}' >{{p.name}}</a>
+                <a class="loqc_button" href="#" onclick='event.preventDefault();$("#save").removeClass("loqc_button_2_inactive");$("#save").addClass("loqc_button_alert");add_user_project("{{p.key}}", null, 100, 100);' >{{p.name}}</a>
             {% endfor %}
         </td>
         <td>
