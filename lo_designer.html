@@ -189,6 +189,8 @@ OutputFigure = draw2d.shape.basic.Polygon.extend({
 document.addEventListener("DOMContentLoaded",function () {
 
     canvas = new draw2d.Canvas("gfx_holder");
+    $("svg").css('left', '');
+    $("svg").css('top', '');
     
     // this is to fix wrong coordinates on canvas scrolling
     // https://stackoverflow.com/questions/22073377/canvas-within-a-scrollable-browser-window-grab-position
