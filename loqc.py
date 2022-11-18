@@ -1,4 +1,4 @@
-from math import pi
+from math import pi, sqrt
 import numpy as np
 import numpy.linalg as la
 #from scipy.linalg import sqrtm
@@ -31,7 +31,16 @@ def run_circuit(input, matrix, dim):
                 b_repr += "+(" + str(matrix[i][j]) + ")*b" + str(j+1)
             b_repr += ")"
             input = input.replace("a" + str(i+1), b_repr)
-    return expand(input)
+    # paired outputs
+    res = str(expand(input))
+    for mode in range(1, dim + 1):
+        res = res.replace("b" + str(mode) + "**2", str(sqrt(2)) + "*b" + str(mode) + "**2")
+        res = res.replace("b" + str(mode) + "**3", str(sqrt(6)) + "*b" + str(mode) + "**3")
+        res = res.replace("b" + str(mode) + "**4", str(sqrt(24)) + "*b" + str(mode) + "**4")
+        res = res.replace("b" + str(mode) + "**5", str(sqrt(120)) + "*b" + str(mode) + "**5")
+        res = res.replace("b" + str(mode) + "**6", str(sqrt(720)) + "*b" + str(mode) + "**6")
+        res = res.replace("b" + str(mode) + "**7", str(sqrt(8040)) + "*b" + str(mode) + "**7")
+    return expand(res)
 
 def use_result(input, mode, val):
     mode_name = "b" + str(mode)
@@ -304,13 +313,13 @@ def calc_psi_and_density(control_modes, dest_modes, ancilla_in_ones, ancilla_out
             result[i][j] = psi[i] * np.conj(psi[j])
     return result, psi, ""
 
-def calc_psi_and_density_XY(control_modes, dest_modes, ancilla_in_ones, ancilla_out_ones, ancilla_zeros, modes, matrix_inverse, state, basis):
-    temp, psi_00, error = calc_psi_and_density(control_modes, dest_modes, ancilla_in_ones, ancilla_out_ones, ancilla_zeros, modes, matrix_inverse, "00")
-    if error:
-        return None, None, error
-    temp, psi_01, error = calc_psi_and_density(control_modes, dest_modes, ancilla_in_ones, ancilla_out_ones, ancilla_zeros, modes, matrix_inverse, "01")
-    temp, psi_10, error = calc_psi_and_density(control_modes, dest_modes, ancilla_in_ones, ancilla_out_ones, ancilla_zeros, modes, matrix_inverse, "10")
-    temp, psi_11, error = calc_psi_and_density(control_modes, dest_modes, ancilla_in_ones, ancilla_out_ones, ancilla_zeros, modes, matrix_inverse, "11")
+def calc_psi_and_density_XY(control_modes, dest_modes, ancilla_in_ones, ancilla_out_ones, ancilla_zeros, modes, matrix_inverse, state, basis, psi_00, psi_01, psi_10, psi_11):
+    #temp, psi_00, error = calc_psi_and_density(control_modes, dest_modes, ancilla_in_ones, ancilla_out_ones, ancilla_zeros, modes, matrix_inverse, "00")
+    #if error:
+    #    return None, None, error
+    #temp, psi_01, error = calc_psi_and_density(control_modes, dest_modes, ancilla_in_ones, ancilla_out_ones, ancilla_zeros, modes, matrix_inverse, "01")
+    #temp, psi_10, error = calc_psi_and_density(control_modes, dest_modes, ancilla_in_ones, ancilla_out_ones, ancilla_zeros, modes, matrix_inverse, "10")
+    #temp, psi_11, error = calc_psi_and_density(control_modes, dest_modes, ancilla_in_ones, ancilla_out_ones, ancilla_zeros, modes, matrix_inverse, "11")
     
     m1 = m2 = 1
     if state[0] == "-":
@@ -328,11 +337,11 @@ def calc_psi_and_density_XY(control_modes, dest_modes, ancilla_in_ones, ancilla_
             result[i][j] = psi[i] * np.conj(psi[j])
     return result, psi, ""        
     
-def calc_density(control_modes, dest_modes, ancilla_in_ones, ancilla_out_ones, ancilla_zeros, modes, matrix_inverse, state, basis):
+def calc_density(control_modes, dest_modes, ancilla_in_ones, ancilla_out_ones, ancilla_zeros, modes, matrix_inverse, state, basis, psi_00, psi_01, psi_10, psi_11):
     if basis == "Z":
         res, psi, error = calc_psi_and_density(control_modes, dest_modes, ancilla_in_ones, ancilla_out_ones, ancilla_zeros, modes, matrix_inverse, state) 
     else:
-        res, psi, error = calc_psi_and_density_XY(control_modes, dest_modes, ancilla_in_ones, ancilla_out_ones, ancilla_zeros, modes, matrix_inverse, state, basis) 
+        res, psi, error = calc_psi_and_density_XY(control_modes, dest_modes, ancilla_in_ones, ancilla_out_ones, ancilla_zeros, modes, matrix_inverse, state, basis, psi_00, psi_01, psi_10, psi_11) 
     return res, error
 
 def calc_probability(control_modes, dest_modes, ancilla_in_ones, ancilla_out_ones, ancilla_zeros, modes, matrix_inverse):
@@ -448,8 +457,23 @@ def get_fidelity(project_key):
 
     Rho = [np.identity(4) for i in range(12)]
     P = np.zeros(12)
-    for i in range(12):
-        Rho[i], error = calc_density(fd['control_modes'], fd['dest_modes'], fd['ancilla_in_ones'], fd['ancilla_out_ones'], fd['ancilla_zeros'], fd['modes'], fd['matrix'], states[i], bases[i])
+
+    temp_00, psi_00, error = calc_psi_and_density(fd['control_modes'], fd['dest_modes'], fd['ancilla_in_ones'], fd['ancilla_out_ones'], fd['ancilla_zeros'], fd['modes'], fd['matrix'], "00")
+    if error:
+        return json.dumps({'error': True, 'data': error}, default=str)
+    temp_01, psi_01, error = calc_psi_and_density(fd['control_modes'], fd['dest_modes'], fd['ancilla_in_ones'], fd['ancilla_out_ones'], fd['ancilla_zeros'], fd['modes'], fd['matrix'], "01")
+    temp_10, psi_10, error = calc_psi_and_density(fd['control_modes'], fd['dest_modes'], fd['ancilla_in_ones'], fd['ancilla_out_ones'], fd['ancilla_zeros'], fd['modes'], fd['matrix'], "10")
+    temp_11, psi_11, error = calc_psi_and_density(fd['control_modes'], fd['dest_modes'], fd['ancilla_in_ones'], fd['ancilla_out_ones'], fd['ancilla_zeros'], fd['modes'], fd['matrix'], "11")
+
+    Rho[0] = temp_00
+    Rho[1] = temp_01
+    Rho[2] = temp_10
+    Rho[3] = temp_11
+    for i in range(4):
+        P[i] = min(1, abs(np.trace(Rho[i])))
+        
+    for i in range(4, 12):
+        Rho[i], error = calc_density(fd['control_modes'], fd['dest_modes'], fd['ancilla_in_ones'], fd['ancilla_out_ones'], fd['ancilla_zeros'], fd['modes'], fd['matrix'], states[i], bases[i], psi_00, psi_01, psi_10, psi_11)
         P[i] = min(1, abs(np.trace(Rho[i])))
     if error:
         return json.dumps({'error': True, 'data': error}, default=str)
@@ -475,8 +499,20 @@ def get_fidelity(project_key):
     Rho_1 = [np.identity(4) for i in range(12)]
     #Rho_1_ = [np.identity(4) for i in range(12)]
     P_1 = np.zeros(12)
-    for i in range(12):
-        Rho_1[i], error = calc_density(fd['control_modes'], fd['dest_modes'], fd['ancilla_in_ones'], fd['ancilla_out_ones'], fd['ancilla_zeros'], fd['modes'], fd['matrix'], states[i], bases[i])
+    temp_00, psi_00, error = calc_psi_and_density(fd['control_modes'], fd['dest_modes'], fd['ancilla_in_ones'], fd['ancilla_out_ones'], fd['ancilla_zeros'], fd['modes'], fd['matrix'], "00")
+    temp_01, psi_01, error = calc_psi_and_density(fd['control_modes'], fd['dest_modes'], fd['ancilla_in_ones'], fd['ancilla_out_ones'], fd['ancilla_zeros'], fd['modes'], fd['matrix'], "01")
+    temp_10, psi_10, error = calc_psi_and_density(fd['control_modes'], fd['dest_modes'], fd['ancilla_in_ones'], fd['ancilla_out_ones'], fd['ancilla_zeros'], fd['modes'], fd['matrix'], "10")
+    temp_11, psi_11, error = calc_psi_and_density(fd['control_modes'], fd['dest_modes'], fd['ancilla_in_ones'], fd['ancilla_out_ones'], fd['ancilla_zeros'], fd['modes'], fd['matrix'], "11")
+
+    Rho_1[0] = temp_00
+    Rho_1[1] = temp_01
+    Rho_1[2] = temp_10
+    Rho_1[3] = temp_11
+    for i in range(4):
+        P_1[i] = min(1, abs(np.trace(Rho_1[i])))
+        
+    for i in range(4, 12):
+        Rho_1[i], error = calc_density(fd['control_modes'], fd['dest_modes'], fd['ancilla_in_ones'], fd['ancilla_out_ones'], fd['ancilla_zeros'], fd['modes'], fd['matrix'], states[i], bases[i], psi_00, psi_01, psi_10, psi_11)
         #Rho_1_[i], error = calc_density(fd_['control_modes'], fd_['dest_modes'], fd_['ancilla_in_ones'], fd_['ancilla_out_ones'], fd_['ancilla_zeros'], fd_['modes'], fd_['matrix'], states[i], bases[i])
         #P_1[i] = min(abs(np.trace(Rho_1[i])), abs(np.trace(Rho_1_[i])))
         P_1[i] = min(abs(np.trace(Rho_1[i])), 1)
@@ -498,8 +534,20 @@ def get_fidelity(project_key):
     Rho_5 = [np.identity(4) for i in range(12)]
     #Rho_5_ = [np.identity(4) for i in range(12)]
     P_5 = np.zeros(12)
-    for i in range(12):
-        Rho_5[i], error = calc_density(fd['control_modes'], fd['dest_modes'], fd['ancilla_in_ones'], fd['ancilla_out_ones'], fd['ancilla_zeros'], fd['modes'], fd['matrix'], states[i], bases[i])
+    temp_00, psi_00, error = calc_psi_and_density(fd['control_modes'], fd['dest_modes'], fd['ancilla_in_ones'], fd['ancilla_out_ones'], fd['ancilla_zeros'], fd['modes'], fd['matrix'], "00")
+    temp_01, psi_01, error = calc_psi_and_density(fd['control_modes'], fd['dest_modes'], fd['ancilla_in_ones'], fd['ancilla_out_ones'], fd['ancilla_zeros'], fd['modes'], fd['matrix'], "01")
+    temp_10, psi_10, error = calc_psi_and_density(fd['control_modes'], fd['dest_modes'], fd['ancilla_in_ones'], fd['ancilla_out_ones'], fd['ancilla_zeros'], fd['modes'], fd['matrix'], "10")
+    temp_11, psi_11, error = calc_psi_and_density(fd['control_modes'], fd['dest_modes'], fd['ancilla_in_ones'], fd['ancilla_out_ones'], fd['ancilla_zeros'], fd['modes'], fd['matrix'], "11")
+
+    Rho_5[0] = temp_00
+    Rho_5[1] = temp_01
+    Rho_5[2] = temp_10
+    Rho_5[3] = temp_11
+    for i in range(4):
+        P_5[i] = min(1, abs(np.trace(Rho_5[i])))
+        
+    for i in range(4, 12):
+        Rho_5[i], error = calc_density(fd['control_modes'], fd['dest_modes'], fd['ancilla_in_ones'], fd['ancilla_out_ones'], fd['ancilla_zeros'], fd['modes'], fd['matrix'], states[i], bases[i], psi_00, psi_01, psi_10, psi_11)
         #Rho_5_[i], error = calc_density(fd_['control_modes'], fd_['dest_modes'], fd_['ancilla_in_ones'], fd_['ancilla_out_ones'], fd_['ancilla_zeros'], fd_['modes'], fd_['matrix'], states[i], bases[i])
         P_5[i] = min(abs(np.trace(Rho_5[i])), 1)
     if error:
