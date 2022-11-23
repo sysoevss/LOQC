@@ -15,7 +15,7 @@ def BS(theta, phi, mode1, mode2, dim):
     res = np.identity(dim, dtype = 'complex_')
     res[mode1][mode1] = np.cos(theta)
     res[mode1][mode2] = -np.exp(1j*phi) * np.sin(theta)
-    res[mode2][mode1] = np.exp(1j*phi) * np.sin(theta)
+    res[mode2][mode1] = np.exp(-1j*phi) * np.sin(theta)
     res[mode2][mode2] = np.cos(theta)
     return res
 def PS(phi, mode, dim):
