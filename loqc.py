@@ -32,15 +32,15 @@ def run_circuit(input, matrix, dim):
             b_repr += ")"
             input = input.replace("a" + str(i+1), b_repr)
     # paired outputs
-    res = str(expand(input))
-    for mode in range(1, dim + 1):
-        res = res.replace("b" + str(mode) + "**2", str(sqrt(2)) + "*b" + str(mode) + "**2")
-        res = res.replace("b" + str(mode) + "**3", str(sqrt(6)) + "*b" + str(mode) + "**3")
-        res = res.replace("b" + str(mode) + "**4", str(sqrt(24)) + "*b" + str(mode) + "**4")
-        res = res.replace("b" + str(mode) + "**5", str(sqrt(120)) + "*b" + str(mode) + "**5")
-        res = res.replace("b" + str(mode) + "**6", str(sqrt(720)) + "*b" + str(mode) + "**6")
-        res = res.replace("b" + str(mode) + "**7", str(sqrt(8040)) + "*b" + str(mode) + "**7")
-    return expand(res)
+    #res = str(expand(input))
+    #for mode in range(1, dim + 1):
+    #    res = res.replace("b" + str(mode) + "**2", str(sqrt(2)) + "*b" + str(mode) + "**2")
+    #    res = res.replace("b" + str(mode) + "**3", str(sqrt(6)) + "*b" + str(mode) + "**3")
+    #    res = res.replace("b" + str(mode) + "**4", str(sqrt(24)) + "*b" + str(mode) + "**4")
+    #    res = res.replace("b" + str(mode) + "**5", str(sqrt(120)) + "*b" + str(mode) + "**5")
+    #    res = res.replace("b" + str(mode) + "**6", str(sqrt(720)) + "*b" + str(mode) + "**6")
+    #    res = res.replace("b" + str(mode) + "**7", str(sqrt(8040)) + "*b" + str(mode) + "**7")
+    return expand(input)
 
 def use_result(input, mode, val):
     mode_name = "b" + str(mode)
@@ -125,7 +125,7 @@ def ConstructCircuit(devs, modes):
             if n >= 0:
                 input = use_result(input, mode, n)
 
-    result = latex(expand(input.xreplace(dict([(n,0) for n in input.atoms(Float) if abs(n) < 1e-12]))))
+    result = latex(expand(input.xreplace(dict([(n,0) for n in input.atoms(Float) if abs(n) < 1e-5]))))
     return result, np.array2string(matrix, separator='&'), np.array2string(inv, separator='&')
 
 
