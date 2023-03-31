@@ -101,6 +101,7 @@ def CopyProject(project_key):
             new_device = LODevice(parent = new_proj.key())
             new_device.id = o.id
             new_device.type = o.type
+            new_device.input_type = o.input_type
             new_device.theta = o.theta
             new_device.phi = o.phi
             new_device.n = o.n

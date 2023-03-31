@@ -631,10 +631,10 @@ def get_cgate_run(project_key, base):
         psi_2 = (psi_00 + 1j*psi_01 - 1j*psi_10 + psi_11) / 2
         psi_3 = (psi_00 - 1j*psi_01 - 1j*psi_10 - psi_11) / 2
         vects = ["y_1 y_1", "y_1 y_2", "y_2 y_1", "y_2 y_2"]
-        basis1 = np.array([0.5, 1j*0.5, 1j*0.5, 0.5], dtype = "complex")
-        basis2 = np.array([0.5, -1j*0.5, 1j*0.5, -0.5], dtype = "complex")
-        basis3 = np.array([0.5, 1j*0.5, -1j*0.5, -0.5], dtype = "complex")
-        basis4 = np.array([0.5, -1j*0.5, -1j*0.5, 0.5], dtype = "complex")
+        basis1 = np.array([0.5, -1j*0.5, -1j*0.5, -0.5], dtype = "complex")
+        basis2 = np.array([0.5, 1j*0.5, -1j*0.5, 0.5], dtype = "complex")
+        basis3 = np.array([0.5, -1j*0.5, 1j*0.5, 0.5], dtype = "complex")
+        basis4 = np.array([0.5, 1j*0.5, 1j*0.5, -0.5], dtype = "complex")
     if base == "z":
         psi_0 = psi_00
         psi_1 = psi_01
