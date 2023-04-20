@@ -31,15 +31,6 @@ def run_circuit(input, matrix, dim):
                 b_repr += "+(" + str(matrix[i][j]) + ")*b" + str(j+1)
             b_repr += ")"
             input = input.replace("a" + str(i+1), b_repr)
-    # paired outputs
-    #res = str(expand(input))
-    #for mode in range(1, dim + 1):
-    #    res = res.replace("b" + str(mode) + "**2", str(sqrt(2)) + "*b" + str(mode) + "**2")
-    #    res = res.replace("b" + str(mode) + "**3", str(sqrt(6)) + "*b" + str(mode) + "**3")
-    #    res = res.replace("b" + str(mode) + "**4", str(sqrt(24)) + "*b" + str(mode) + "**4")
-    #    res = res.replace("b" + str(mode) + "**5", str(sqrt(120)) + "*b" + str(mode) + "**5")
-    #    res = res.replace("b" + str(mode) + "**6", str(sqrt(720)) + "*b" + str(mode) + "**6")
-    #    res = res.replace("b" + str(mode) + "**7", str(sqrt(8040)) + "*b" + str(mode) + "**7")
     return expand(input)
 
 def use_result(input, mode, val):
@@ -232,10 +223,13 @@ def ConstructCircuitMatrixWithError(devs, modes, bs_error):
         return None, None, "ConstructCircuitMatrixWithError: " + str(ex)        
 
 def use_ancillas(input, ones, zeros):
-    for i in ones:
-        input = use_result(input, i, 1)
+    # zeros
     for i in zeros:
         input = use_result(input, i, 0)
+
+    # ones
+    for i in ones:
+        input = use_result(input, i, 1)
     return input
 
 def check_circuit_modes_list(control_modes, dest_modes, ancilla_in_ones, ancilla_out_ones, ancilla_zeros, modes):
@@ -257,28 +251,28 @@ def use_input_ancillas(ancilla_in_ones):
     return input
 
 def get_psi_0(input, control_modes, dest_modes):
-    out = use_result(input, control_modes[1], 1)
-    out = use_result(out, dest_modes[1], 1)     
-    out = use_result(out, control_modes[0], 0)
+    out = use_result(input, control_modes[0], 0)
     out = use_result(out, dest_modes[0], 0)     
+    out = use_result(out, control_modes[1], 1)
+    out = use_result(out, dest_modes[1], 1)     
     return complex(out)
 def get_psi_1(input, control_modes, dest_modes):
-    out = use_result(input, control_modes[1], 1)
-    out = use_result(out, dest_modes[0], 1)     
-    out = use_result(out, control_modes[0], 0)
+    out = use_result(input, control_modes[0], 0)
     out = use_result(out, dest_modes[1], 0)     
+    out = use_result(out, control_modes[1], 1)
+    out = use_result(out, dest_modes[0], 1)     
     return complex(out)
 def get_psi_2(input, control_modes, dest_modes):
-    out = use_result(input, control_modes[0], 1)
-    out = use_result(out, dest_modes[1], 1)     
-    out = use_result(out, control_modes[1], 0)
+    out = use_result(input, control_modes[1], 0)
     out = use_result(out, dest_modes[0], 0)     
+    out = use_result(out, control_modes[0], 1)
+    out = use_result(out, dest_modes[1], 1)     
     return complex(out)
 def get_psi_3(input, control_modes, dest_modes):
-    out = use_result(input, control_modes[0], 1)
-    out = use_result(out, dest_modes[0], 1)     
-    out = use_result(out, control_modes[1], 0)
+    out = use_result(input, control_modes[1], 0)
     out = use_result(out, dest_modes[1], 0)     
+    out = use_result(out, control_modes[0], 1)
+    out = use_result(out, dest_modes[0], 1)     
     return complex(out)
 
 def calc_psi_and_density(control_modes, dest_modes, ancilla_in_ones, ancilla_out_ones, ancilla_zeros, modes, matrix_inverse, state):
@@ -313,14 +307,7 @@ def calc_psi_and_density(control_modes, dest_modes, ancilla_in_ones, ancilla_out
             result[i][j] = psi[i] * np.conj(psi[j])
     return result, psi, ""
 
-def calc_psi_and_density_XY(control_modes, dest_modes, ancilla_in_ones, ancilla_out_ones, ancilla_zeros, modes, matrix_inverse, state, basis, psi_00, psi_01, psi_10, psi_11):
-    #temp, psi_00, error = calc_psi_and_density(control_modes, dest_modes, ancilla_in_ones, ancilla_out_ones, ancilla_zeros, modes, matrix_inverse, "00")
-    #if error:
-    #    return None, None, error
-    #temp, psi_01, error = calc_psi_and_density(control_modes, dest_modes, ancilla_in_ones, ancilla_out_ones, ancilla_zeros, modes, matrix_inverse, "01")
-    #temp, psi_10, error = calc_psi_and_density(control_modes, dest_modes, ancilla_in_ones, ancilla_out_ones, ancilla_zeros, modes, matrix_inverse, "10")
-    #temp, psi_11, error = calc_psi_and_density(control_modes, dest_modes, ancilla_in_ones, ancilla_out_ones, ancilla_zeros, modes, matrix_inverse, "11")
-    
+def calc_psi_and_density_XY(control_modes, dest_modes, ancilla_in_ones, ancilla_out_ones, ancilla_zeros, modes, matrix_inverse, state, basis, psi_00, psi_01, psi_10, psi_11):   
     m1 = m2 = 1
     if state[0] == "-":
         m1 = -1
@@ -343,20 +330,6 @@ def calc_density(control_modes, dest_modes, ancilla_in_ones, ancilla_out_ones, a
     else:
         res, psi, error = calc_psi_and_density_XY(control_modes, dest_modes, ancilla_in_ones, ancilla_out_ones, ancilla_zeros, modes, matrix_inverse, state, basis, psi_00, psi_01, psi_10, psi_11) 
     return res, error
-
-def calc_probability(control_modes, dest_modes, ancilla_in_ones, ancilla_out_ones, ancilla_zeros, modes, matrix_inverse):
-    rho_00, error = calc_density(control_modes, dest_modes, ancilla_in_ones, ancilla_out_ones, ancilla_zeros, modes, matrix_inverse, "00")
-    rho_01, error = calc_density(control_modes, dest_modes, ancilla_in_ones, ancilla_out_ones, ancilla_zeros, modes, matrix_inverse, "01")
-    rho_10, error = calc_density(control_modes, dest_modes, ancilla_in_ones, ancilla_out_ones, ancilla_zeros, modes, matrix_inverse, "10")
-    rho_11, error = calc_density(control_modes, dest_modes, ancilla_in_ones, ancilla_out_ones, ancilla_zeros, modes, matrix_inverse, "11")
-    if error:
-        return None, None, None, None, None, error
-    p0 = abs(np.trace(rho_00))
-    p1 = abs(np.trace(rho_01))
-    p2 = abs(np.trace(rho_10))
-    p3 = abs(np.trace(rho_11))
-    min_prob = min([p0, p1, p2, p3])
-    return [min_prob, p0, p1, p2, p3], ""
 
 # can't use scipy in appengine  
 # thanks to Tristan Nemoz for this answer:
