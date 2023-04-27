@@ -615,7 +615,15 @@ document.addEventListener("DOMContentLoaded",function () {
         }
         $("#save").removeClass("loqc_button_2_inactive");
         $("#save").addClass("loqc_button_alert");
-    });    
+    });   
+    $("#undo").click(function(e) {
+        e.preventDefault(); 
+		canvas.getCommandStack().undo();
+	});
+    $("#redo").click(function(e) {
+        e.preventDefault(); 
+		canvas.getCommandStack().redo();
+	});
     
     // For some reason after this iframe starts to accept keyboard events
     $("#activate").click(function(e) {
@@ -749,6 +757,8 @@ function add_user_project(key, id, x, y) {
         <td style="width:180px;vertical-align: top;">
             <a class="loqc_button_2_inactive" href="#" id='save' >Save</a>
             <a class="loqc_button_2" href="#" id='delete_selection' title="Delete selection">Delete</a>
+            <a class="loqc_button_2" href="#" style="width:32px;" id='undo' title="Undo"><i class="icon-arrow-left"></i></a> 
+            <a class="loqc_button_2" href="#" style="width:32px;" id='redo' title="Redo"><i class="icon-arrow-right"></i></a> 
             <a class="loqc_button_2" href="#" style="width:32px;" id='scale_minus' title="Zoom out"><i class="icon-zoom-out"></i></a>
             <a class="loqc_button_2" href="#" style="width:32px;" id='scale_plus' title="Zoom-in"><i class="icon-zoom-in"></i></a>   
             <a class="loqc_button_2 tooltip" href="#" id='activate' style="display:none;">Unlock<span class="tooltiptext">Press me when 'Delete' doesn't work!</span></a>
