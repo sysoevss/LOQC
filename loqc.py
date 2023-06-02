@@ -341,12 +341,15 @@ def matrix_sqrt(a):
     sqrt_matrix = reduce(np.dot, [evectors, np.diag(np.sqrt(evalues)), np.linalg.inv(evectors)])
     return sqrt_matrix
 def calc_fidelity(rho_out, rho):
-    tr_rho = np.trace(rho)
-    tr_out = np.trace(rho_out)
-    sqrt_rho = matrix_sqrt(rho)
-    if tr_rho * tr_out == 0:
+    try:
+        tr_rho = np.trace(rho)
+        tr_out = np.trace(rho_out)
+        sqrt_rho = matrix_sqrt(rho)
+        if tr_rho * tr_out == 0:
+            return 0
+        return abs(np.trace(matrix_sqrt(reduce(np.dot, [sqrt_rho, rho_out, sqrt_rho]))) ** 2 / (tr_rho * tr_out))
+    except:
         return 0
-    return abs(np.trace(matrix_sqrt(reduce(np.dot, [sqrt_rho, rho_out, sqrt_rho]))) ** 2 / (tr_rho * tr_out))
 
 def calc_rho(gate, state):
     cgate = np.identity(4, dtype = 'complex_')
@@ -414,7 +417,7 @@ def calc_fidelity_values(rho, gate):
 
 
 
-def get_fidelity(project_key):
+def get_fidelity(project_key, errors):
     # check if we already did the calculation
     #circ = data.GetCircuit(project_key)
     #if circ:
@@ -463,74 +466,81 @@ def get_fidelity(project_key):
         vals = vals_cx
         gate = "CX"
 
-    # error 1%
-    fd, error = getCircuitFidelityData(project_key, 0.01)
-    #fd_, error = getCircuitFidelityData(project_key, -0.01)
-    if error:
-        return json.dumps({'error': True, 'data': error}, default=str)
+    if errors:
+        # error 1%
+        fd, error = getCircuitFidelityData(project_key, 0.01)
+        #fd_, error = getCircuitFidelityData(project_key, -0.01)
+        if error:
+            return json.dumps({'error': True, 'data': error}, default=str)
 
-    Rho_1 = [np.identity(4) for i in range(12)]
-    #Rho_1_ = [np.identity(4) for i in range(12)]
-    P_1 = np.zeros(12)
-    temp_00, psi_00, error = calc_psi_and_density(fd['control_modes'], fd['dest_modes'], fd['ancilla_in_ones'], fd['ancilla_out_ones'], fd['ancilla_zeros'], fd['modes'], fd['matrix'], "00")
-    temp_01, psi_01, error = calc_psi_and_density(fd['control_modes'], fd['dest_modes'], fd['ancilla_in_ones'], fd['ancilla_out_ones'], fd['ancilla_zeros'], fd['modes'], fd['matrix'], "01")
-    temp_10, psi_10, error = calc_psi_and_density(fd['control_modes'], fd['dest_modes'], fd['ancilla_in_ones'], fd['ancilla_out_ones'], fd['ancilla_zeros'], fd['modes'], fd['matrix'], "10")
-    temp_11, psi_11, error = calc_psi_and_density(fd['control_modes'], fd['dest_modes'], fd['ancilla_in_ones'], fd['ancilla_out_ones'], fd['ancilla_zeros'], fd['modes'], fd['matrix'], "11")
+        Rho_1 = [np.identity(4) for i in range(12)]
+        #Rho_1_ = [np.identity(4) for i in range(12)]
+        P_1 = np.zeros(12)
+        temp_00, psi_00, error = calc_psi_and_density(fd['control_modes'], fd['dest_modes'], fd['ancilla_in_ones'], fd['ancilla_out_ones'], fd['ancilla_zeros'], fd['modes'], fd['matrix'], "00")
+        temp_01, psi_01, error = calc_psi_and_density(fd['control_modes'], fd['dest_modes'], fd['ancilla_in_ones'], fd['ancilla_out_ones'], fd['ancilla_zeros'], fd['modes'], fd['matrix'], "01")
+        temp_10, psi_10, error = calc_psi_and_density(fd['control_modes'], fd['dest_modes'], fd['ancilla_in_ones'], fd['ancilla_out_ones'], fd['ancilla_zeros'], fd['modes'], fd['matrix'], "10")
+        temp_11, psi_11, error = calc_psi_and_density(fd['control_modes'], fd['dest_modes'], fd['ancilla_in_ones'], fd['ancilla_out_ones'], fd['ancilla_zeros'], fd['modes'], fd['matrix'], "11")
 
-    Rho_1[0] = temp_00
-    Rho_1[1] = temp_01
-    Rho_1[2] = temp_10
-    Rho_1[3] = temp_11
-    for i in range(4):
-        P_1[i] = min(1, abs(np.trace(Rho_1[i])))
-        
-    for i in range(4, 12):
-        Rho_1[i], error = calc_density(fd['control_modes'], fd['dest_modes'], fd['ancilla_in_ones'], fd['ancilla_out_ones'], fd['ancilla_zeros'], fd['modes'], fd['matrix'], states[i], bases[i], psi_00, psi_01, psi_10, psi_11)
-        #Rho_1_[i], error = calc_density(fd_['control_modes'], fd_['dest_modes'], fd_['ancilla_in_ones'], fd_['ancilla_out_ones'], fd_['ancilla_zeros'], fd_['modes'], fd_['matrix'], states[i], bases[i])
-        #P_1[i] = min(abs(np.trace(Rho_1[i])), abs(np.trace(Rho_1_[i])))
-        P_1[i] = min(abs(np.trace(Rho_1[i])), 1)
-    if error:
-        return json.dumps({'error': True, 'data': error}, default=str)
-    min_prob_1 = min(P_1)
+        Rho_1[0] = temp_00
+        Rho_1[1] = temp_01
+        Rho_1[2] = temp_10
+        Rho_1[3] = temp_11
+        for i in range(4):
+            P_1[i] = min(1, abs(np.trace(Rho_1[i])))
+            
+        for i in range(4, 12):
+            Rho_1[i], error = calc_density(fd['control_modes'], fd['dest_modes'], fd['ancilla_in_ones'], fd['ancilla_out_ones'], fd['ancilla_zeros'], fd['modes'], fd['matrix'], states[i], bases[i], psi_00, psi_01, psi_10, psi_11)
+            #Rho_1_[i], error = calc_density(fd_['control_modes'], fd_['dest_modes'], fd_['ancilla_in_ones'], fd_['ancilla_out_ones'], fd_['ancilla_zeros'], fd_['modes'], fd_['matrix'], states[i], bases[i])
+            #P_1[i] = min(abs(np.trace(Rho_1[i])), abs(np.trace(Rho_1_[i])))
+            P_1[i] = min(abs(np.trace(Rho_1[i])), 1)
+        if error:
+            return json.dumps({'error': True, 'data': error}, default=str)
+        min_prob_1 = min(P_1)
 
-    vals_1 = calc_fidelity_values(Rho_1, gate)
-    #vals_1_ = calc_fidelity_values(Rho_1_, gate)
-    #if vals_1_[0] < vals_1[0]:
-    #    vals_1 = vals_1_
+        vals_1 = calc_fidelity_values(Rho_1, gate)
+        #vals_1_ = calc_fidelity_values(Rho_1_, gate)
+        #if vals_1_[0] < vals_1[0]:
+        #    vals_1 = vals_1_
 
-    # error 5%
-    fd, error = getCircuitFidelityData(project_key, 0.05)
-    #fd_, error = getCircuitFidelityData(project_key, -0.05)
-    if error:
-        return json.dumps({'error': True, 'data': error}, default=str)
+        # error 5%
+        fd, error = getCircuitFidelityData(project_key, 0.05)
+        #fd_, error = getCircuitFidelityData(project_key, -0.05)
+        if error:
+            return json.dumps({'error': True, 'data': error}, default=str)
 
-    Rho_5 = [np.identity(4) for i in range(12)]
-    #Rho_5_ = [np.identity(4) for i in range(12)]
-    P_5 = np.zeros(12)
-    temp_00, psi_00, error = calc_psi_and_density(fd['control_modes'], fd['dest_modes'], fd['ancilla_in_ones'], fd['ancilla_out_ones'], fd['ancilla_zeros'], fd['modes'], fd['matrix'], "00")
-    temp_01, psi_01, error = calc_psi_and_density(fd['control_modes'], fd['dest_modes'], fd['ancilla_in_ones'], fd['ancilla_out_ones'], fd['ancilla_zeros'], fd['modes'], fd['matrix'], "01")
-    temp_10, psi_10, error = calc_psi_and_density(fd['control_modes'], fd['dest_modes'], fd['ancilla_in_ones'], fd['ancilla_out_ones'], fd['ancilla_zeros'], fd['modes'], fd['matrix'], "10")
-    temp_11, psi_11, error = calc_psi_and_density(fd['control_modes'], fd['dest_modes'], fd['ancilla_in_ones'], fd['ancilla_out_ones'], fd['ancilla_zeros'], fd['modes'], fd['matrix'], "11")
+        Rho_5 = [np.identity(4) for i in range(12)]
+        #Rho_5_ = [np.identity(4) for i in range(12)]
+        P_5 = np.zeros(12)
+        temp_00, psi_00, error = calc_psi_and_density(fd['control_modes'], fd['dest_modes'], fd['ancilla_in_ones'], fd['ancilla_out_ones'], fd['ancilla_zeros'], fd['modes'], fd['matrix'], "00")
+        temp_01, psi_01, error = calc_psi_and_density(fd['control_modes'], fd['dest_modes'], fd['ancilla_in_ones'], fd['ancilla_out_ones'], fd['ancilla_zeros'], fd['modes'], fd['matrix'], "01")
+        temp_10, psi_10, error = calc_psi_and_density(fd['control_modes'], fd['dest_modes'], fd['ancilla_in_ones'], fd['ancilla_out_ones'], fd['ancilla_zeros'], fd['modes'], fd['matrix'], "10")
+        temp_11, psi_11, error = calc_psi_and_density(fd['control_modes'], fd['dest_modes'], fd['ancilla_in_ones'], fd['ancilla_out_ones'], fd['ancilla_zeros'], fd['modes'], fd['matrix'], "11")
 
-    Rho_5[0] = temp_00
-    Rho_5[1] = temp_01
-    Rho_5[2] = temp_10
-    Rho_5[3] = temp_11
-    for i in range(4):
-        P_5[i] = min(1, abs(np.trace(Rho_5[i])))
-        
-    for i in range(4, 12):
-        Rho_5[i], error = calc_density(fd['control_modes'], fd['dest_modes'], fd['ancilla_in_ones'], fd['ancilla_out_ones'], fd['ancilla_zeros'], fd['modes'], fd['matrix'], states[i], bases[i], psi_00, psi_01, psi_10, psi_11)
-        #Rho_5_[i], error = calc_density(fd_['control_modes'], fd_['dest_modes'], fd_['ancilla_in_ones'], fd_['ancilla_out_ones'], fd_['ancilla_zeros'], fd_['modes'], fd_['matrix'], states[i], bases[i])
-        P_5[i] = min(abs(np.trace(Rho_5[i])), 1)
-    if error:
-        return json.dumps({'error': True, 'data': error}, default=str)
-    min_prob_5 = min(P_5)
+        Rho_5[0] = temp_00
+        Rho_5[1] = temp_01
+        Rho_5[2] = temp_10
+        Rho_5[3] = temp_11
+        for i in range(4):
+            P_5[i] = min(1, abs(np.trace(Rho_5[i])))
+            
+        for i in range(4, 12):
+            Rho_5[i], error = calc_density(fd['control_modes'], fd['dest_modes'], fd['ancilla_in_ones'], fd['ancilla_out_ones'], fd['ancilla_zeros'], fd['modes'], fd['matrix'], states[i], bases[i], psi_00, psi_01, psi_10, psi_11)
+            #Rho_5_[i], error = calc_density(fd_['control_modes'], fd_['dest_modes'], fd_['ancilla_in_ones'], fd_['ancilla_out_ones'], fd_['ancilla_zeros'], fd_['modes'], fd_['matrix'], states[i], bases[i])
+            P_5[i] = min(abs(np.trace(Rho_5[i])), 1)
+        if error:
+            return json.dumps({'error': True, 'data': error}, default=str)
+        min_prob_5 = min(P_5)
 
-    vals_5 = calc_fidelity_values(Rho_5, gate)
-    #vals_5_ = calc_fidelity_values(Rho_5_, gate)
-    #if vals_5_[0] < vals_5[0]:
-    #    vals_5 = vals_5_
+        vals_5 = calc_fidelity_values(Rho_5, gate)
+        #vals_5_ = calc_fidelity_values(Rho_5_, gate)
+        #if vals_5_[0] < vals_5[0]:
+        #    vals_5 = vals_5_
+    else:
+        min_prob_1 = min_prob_5 = 0 
+        P_1 = np.zeros(12)
+        P_5 = np.zeros(12)
+        vals_1 = np.zeros(13)
+        vals_5 = np.zeros(13)        
 
     fidelities = json.dumps({'error': False, 'data': {'p_0': [min_prob] + P.tolist(),
                                                 'p_1': [min_prob_1] + P_1.tolist(),

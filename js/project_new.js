@@ -145,7 +145,8 @@ $(document).ready(function() {
         if (fidChart) fidChart.destroy();
         
         $("#fidelity_res").html("");
-        $.get('/get_fidelity/', {project_key: $("#current_project_key").html()}, function(json) {
+        let with_errors = $("#fidelity_errors").prop("checked");
+        $.get('/get_fidelity/', {project_key: $("#current_project_key").html(), errors: with_errors }, function(json) {
             $("#fidelity_refresh").show();
             res = JSON.parse(json);
             if (res.error == true) {

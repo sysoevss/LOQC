@@ -152,7 +152,8 @@ class GetLibrary(webapp2.RequestHandler):
 class GetFidelity(webapp2.RequestHandler):
     def get(self):
         key = self.request.get('project_key')
-        self.response.out.write(loqc.get_fidelity(key))          
+        errors = (self.request.get('errors') == "true")
+        self.response.out.write(loqc.get_fidelity(key, errors))          
 
 application = webapp2.WSGIApplication([('/', MainPage),
                                        ('/login', LoginPage),
