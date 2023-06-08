@@ -465,8 +465,8 @@ document.addEventListener("DOMContentLoaded",function () {
                   phi: String(el.phi),
                   n: String(el.N),
                   input_type: String(el.input_type),
-                  x: el.x,
-                  y: el.y,
+                  x: Math.round(el.x),
+                  y: Math.round(el.y),
                   project_key: el.project_key};
     }
     function serialize_connection(el, suffix = "") {
