@@ -1,12 +1,8 @@
-runtime: python27
-api_version: 1
-threadsafe: true
+runtime: python313
+entrypoint: gunicorn -b :$PORT main:application
 
 env_variables:
   GAE_USE_SUBPROCESS: 0
-libraries:
-- name: numpy
-  version: "1.6.1"   
 handlers:
 - url: /js
   static_dir: js  
@@ -18,4 +14,4 @@ handlers:
   static_dir: img  
 
 - url: /.*
-  script: main.application
+  script: auto

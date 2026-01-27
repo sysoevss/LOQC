@@ -1,2 +1,6 @@
-numpy==1.6.1
+numpy
 sympy
+google-cloud-ndb
+webapp2==3.0.0b1
+jinja2
+gunicorn

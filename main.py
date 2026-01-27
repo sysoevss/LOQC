@@ -4,13 +4,15 @@ Created on 07.04.2022
 
 @author: sysoev
 '''
-import webapp2
-from google.appengine.ext.webapp.util import run_wsgi_app
-from google.appengine.ext.webapp import template
-from google.appengine.api import users
-
 import os
 import json
+import urllib.parse
+
+import webapp2
+import jinja2
+
+import users_compat as users
+
 import data
 import loqc
 
@@ -18,42 +20,61 @@ import loqc
 #  Login etc   
 # 
 
-class MainPage(webapp2.RequestHandler):
+_TEMPLATE_ENV = jinja2.Environment(
+    loader=jinja2.FileSystemLoader(os.path.dirname(__file__)),
+    autoescape=True,
+)
+
+
+def _render_template(filename, values):
+    template = _TEMPLATE_ENV.get_template(filename)
+    return template.render(values or {})
+
+
+class BaseHandler(webapp2.RequestHandler):
+    def dispatch(self):
+        users.set_request_environ(self.request.environ)
+        try:
+            with data.ndb_context():
+                super(BaseHandler, self).dispatch()
+        finally:
+            users.clear_request_environ()
+
+
+class MainPage(BaseHandler):
+    def get(self):
+        #user = users.get_current_user()
+        #if not user:
+        template_values = {
+            'isAdmin': False
+        }
+        self.response.write(_render_template('main.html', template_values))
+        #else:
+        #    self.redirect('/my')
+        #    return 
+
+class LoginPage(BaseHandler):
     def get(self):
         user = users.get_current_user()
         if not user:
-            template_values = {
-                'isAdmin': False
-            }
-            path = os.path.join(os.path.dirname(__file__), 'main.html')
-            self.response.out.write(template.render(path, template_values))  
-        else:
             self.redirect('/my')
-            return 
+            return
+        continue_to = self.request.get('continue') or '/my'
+        self.redirect(continue_to)
+        return
 
-class LoginPage(webapp2.RequestHandler):
-    def get(self):
-        user = users.get_current_user()
-        if not user:
-            login_page = users.create_login_url('/')
-            self.redirect(login_page)
-            return 
-        else:
-            self.redirect('/my')
-            return 
-
-class LogoutPage(webapp2.RequestHandler):
+class LogoutPage(BaseHandler):
     def get(self):
         user = users.get_current_user()
         if user:
-            logout_page = users.create_logout_url('/')
+            logout_page = 'https://accounts.google.com/Logout'
             self.redirect(logout_page)
-            return 
+            return
         else:
             self.redirect('/')
             return 
 
-class ProjectsPage(webapp2.RequestHandler):
+class ProjectsPage(BaseHandler):
     def get(self):
         user = users.get_current_user()
         if not user:
@@ -62,98 +83,107 @@ class ProjectsPage(webapp2.RequestHandler):
             return         
         else:
             template_values = {}
-            path = os.path.join(os.path.dirname(__file__), 'projects.html')
-            self.response.out.write(template.render(path, template_values))  
+            self.response.write(_render_template('projects.html', template_values))
 
 
 #
 #  Common object methods   
 # 
 
-class CycleObjects(webapp2.RequestHandler):
+class CycleObjects(BaseHandler):
     def get(self):
         object_type = self.request.get('object_type')
         parent_key = self.request.get('parent_key')
         self.response.out.write(data.CycleObjects(object_type, parent_key))
-class GetObjectByKey(webapp2.RequestHandler):
+class GetObjectByKey(BaseHandler):
     def get(self):
         object_type = self.request.get('object_type')
         key = self.request.get('key')
         self.response.out.write(data.GetObjectByKey(object_type, key))  
-class DeleteCycleObject(webapp2.RequestHandler):
+class DeleteCycleObject(BaseHandler):
     def get(self):
         object_type = self.request.get('object_type')
         key = self.request.get('key')
         self.response.out.write(data.DeleteCycleObject(key, object_type))     
-class AddCycleObject(webapp2.RequestHandler):
+class AddCycleObject(BaseHandler):
     def post(self):
         object_type = self.request.get('object_type')
         parent_key = self.request.get('parent_key')        
         dat = self.request.get('data')
         self.response.out.write(data.AddCycleObject(dat, object_type, parent_key))     
-class EditCycleObject(webapp2.RequestHandler):
+class EditCycleObject(BaseHandler):
     def post(self):
         object_type = self.request.get('object_type')
         dat = self.request.get('data')
         key = self.request.get('key')
         self.response.out.write(data.EditCycleObject(key, dat, object_type)) 
 
-class LODesigner(webapp2.RequestHandler):
+class LODesigner(BaseHandler):
     def get(self):
         user = users.get_current_user()
         if not user:
-            self.response.out.write("Re-login please")
+            self.response.write("Re-login please")
         else:
             project_key = self.request.get('id')
             if project_key == "0":
-                self.response.out.write("<html></html>")  
+                self.response.write("<html></html>")
             else:
                 projs = data.getProjects()
                 projects = []
                 for p in projs:
-                    if str(p.key()) != project_key and p.name != "ParentOfAllProjects3717481125":
-                        projects.append({'key': p.key(), 'name': p.name})
+                    if data.key_to_str(p.key) != project_key and p.name != "ParentOfAllProjects3717481125":
+                        projects.append({'key': data.key_to_str(p.key), 'name': p.name})
                 template_values = {'project_key': project_key, 'projects': projects}
-                path = os.path.join(os.path.dirname(__file__), 'lo_designer.html')
-                self.response.out.write(template.render(path, template_values))  
-class ClearDesign(webapp2.RequestHandler):
+                self.response.write(_render_template('lo_designer.html', template_values))
+class ClearDesign(BaseHandler):
     def get(self):
         project_key = self.request.get('id')
-        self.response.out.write(data.ClearProjectDesign(project_key))  
-class Simulate(webapp2.RequestHandler):
+        self.response.write(data.ClearProjectDesign(project_key))
+class Simulate(BaseHandler):
     def get(self):
         project_key = self.request.get('project_key')
-        self.response.out.write(data.ConstructCircuit(project_key))  
-class SimulateCGate(webapp2.RequestHandler):
+        self.response.write(data.ConstructCircuit(project_key))
+class SimulateCGate(BaseHandler):
     def get(self):
         project_key = self.request.get('project_key')
         gate = self.request.get('gate')
         res, error = loqc.get_cgate_run(project_key, gate)
         if error:
-            self.response.out.write(error)  
+            self.response.write(error)
         else:            
-            self.response.out.write(res)  
-class PublishProject(webapp2.RequestHandler):
+            self.response.write(res)
+class PublishProject(BaseHandler):
     def post(self):
         key = self.request.get('key')
         png = self.request.get('png')
-        self.response.out.write(data.PublishProject(key, png)) 
-class CopyProject(webapp2.RequestHandler):
+        self.response.write(data.PublishProject(key, png))
+class CopyProject(BaseHandler):
     def get(self):
         key = self.request.get('key')
-        self.response.out.write(data.CopyProject(key))   
-class GetMatrices(webapp2.RequestHandler):
+        self.response.write(data.CopyProject(key))
+class GetMatrices(BaseHandler):
     def get(self):
         key = self.request.get('project_key')
-        self.response.out.write(data.GetMatrices(key))  
-class GetLibrary(webapp2.RequestHandler):
+        self.response.write(data.GetMatrices(key))
+class GetLibrary(BaseHandler):
     def get(self):
-        self.response.out.write(data.GetLibrary()) 
-class GetFidelity(webapp2.RequestHandler):
+        self.response.write(data.GetLibrary())
+class GetFidelity(BaseHandler):
     def get(self):
         key = self.request.get('project_key')
         errors = (self.request.get('errors') == "true")
-        self.response.out.write(loqc.get_fidelity(key, errors))          
+        self.response.write(loqc.get_fidelity(key, errors))
+
+
+class MigrateProjectUsers(BaseHandler):
+    def get(self):
+        user = users.get_current_user()
+        if not user:
+            self.response.write("Not authorized")
+            return
+        use_fallback = (self.request.get('use_fallback') == "true")
+        fallback_email = data.current_user_email() if use_fallback else None
+        self.response.write(data.MigrateProjectUsers(fallback_email=fallback_email))
 
 application = webapp2.WSGIApplication([('/', MainPage),
                                        ('/login', LoginPage),
@@ -172,5 +202,6 @@ application = webapp2.WSGIApplication([('/', MainPage),
                                        ('/copy_project/', CopyProject),
                                        ('/matrices/', GetMatrices),
                                        ('/get_library/', GetLibrary),
-                                       ('/get_fidelity/', GetFidelity)], 
+                                       ('/get_fidelity/', GetFidelity),
+                                       ('/migrate_project_users/', MigrateProjectUsers)], 
                                      debug=True)

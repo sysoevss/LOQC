@@ -12,14 +12,14 @@ from re import sub
 #  Function declarations
 #
 def BS(theta, phi, mode1, mode2, dim):
-    res = np.identity(dim, dtype = 'complex_')
+    res = np.identity(dim, dtype=complex)
     res[mode1][mode1] = np.cos(theta)
     res[mode1][mode2] = -np.exp(1j*phi) * np.sin(theta)
     res[mode2][mode1] = np.exp(-1j*phi) * np.sin(theta)
     res[mode2][mode2] = np.cos(theta)
     return res
 def PS(phi, mode, dim):
-    res = np.identity(dim, dtype = 'complex_')
+    res = np.identity(dim, dtype=complex)
     res[mode][mode] = np.exp(1j*phi) 
     return res
 
@@ -50,7 +50,7 @@ def use_result(input, mode, val):
     return input
 
 def sub_circ(matrix, dim, modes):
-    res = np.identity(dim, dtype = 'complex_')
+    res = np.identity(dim, dtype=complex)
     circ_dim = len(modes)
     for i in range(circ_dim):
         for j in range(circ_dim):
@@ -63,7 +63,7 @@ def print_result(input):
 
 def ConstructCircuit(devs, modes): 
     circuit = []
-    circuit.append(np.identity(modes, dtype = 'complex_'))
+    circuit.append(np.identity(modes, dtype=complex))
     input = "1"
 
     # process inputs
@@ -98,7 +98,7 @@ def ConstructCircuit(devs, modes):
             circ_m = np.asarray(np.matrix(str(matr_string)))
             circ_modes = [-1 for i in range(circ.modes)]
             for m in d['modes']:
-                index = int(m['my_port'][6:]) / 2
+                index = int(m['my_port'][6:]) // 2
                 circ_modes[index] = m['mode']
             circuit.append(sub_circ(circ_m, modes, circ_modes))
 
@@ -182,7 +182,7 @@ def ConstructCircuitMatrixWithError(devs, modes, bs_error):
     try:
         # prepare
         circuit = []
-        circuit.append(np.identity(modes, dtype = 'complex_'))
+        circuit.append(np.identity(modes, dtype=complex))
 
         # process devices
         devices = [a for a in devs if (a['type'] != "IN" and a['type'] != "OUT")]   
@@ -211,7 +211,7 @@ def ConstructCircuitMatrixWithError(devs, modes, bs_error):
                 circ_m, circ_inv, error = ConstructCircuitMatrixWithError(circ_devs, circ_modes, bs_error)
                 circ_modes = [-1 for i in range(circ.modes)]
                 for m in d['modes']:
-                    index = int(m['my_port'][6:]) / 2
+                    index = int(m['my_port'][6:]) // 2
                     circ_modes[index] = m['mode']
                 circuit.append(sub_circ(circ_m, modes, circ_modes))
 
@@ -295,13 +295,13 @@ def calc_psi_and_density(control_modes, dest_modes, ancilla_in_ones, ancilla_out
     input = use_ancillas(input, ancilla_out_ones, ancilla_zeros)
 
     # vector
-    psi = np.zeros(4, dtype = 'complex_')
+    psi = np.zeros(4, dtype=complex)
     psi[0] = get_psi_0(input, control_modes, dest_modes)
     psi[1] = get_psi_1(input, control_modes, dest_modes)
     psi[2] = get_psi_2(input, control_modes, dest_modes)
     psi[3] = get_psi_3(input, control_modes, dest_modes)
 
-    result = np.identity(4, dtype = 'complex_')
+    result = np.identity(4, dtype=complex)
     for i in range(4):
         for j in range(4):
             result[i][j] = psi[i] * np.conj(psi[j])
@@ -318,7 +318,7 @@ def calc_psi_and_density_XY(control_modes, dest_modes, ancilla_in_ones, ancilla_
     if basis == "Y":
         psi = 0.5 * (psi_00 + 1j*m2*psi_01 + 1j*m1*psi_10 - m1*m2*psi_11)
 
-    result = np.identity(4, dtype = 'complex_')
+    result = np.identity(4, dtype=complex)
     for i in range(4):
         for j in range(4):
             result[i][j] = psi[i] * np.conj(psi[j])
@@ -352,7 +352,7 @@ def calc_fidelity(rho_out, rho):
         return 0
 
 def calc_rho(gate, state):
-    cgate = np.identity(4, dtype = 'complex_')
+    cgate = np.identity(4, dtype=complex)
     if gate == "CZ":
         state[3] = -state[3]
     if gate == "CX":

@@ -1,5 +1,9 @@
 # appengine_config.py
-from google.appengine.ext import vendor
+try:
+    from google.appengine.ext import vendor
+except Exception:
+    vendor = None
 
-# Add any libraries install in the "lib" folder.
-vendor.add('lib')
+# Add any libraries installed in the "lib" folder (GAE legacy).
+if vendor:
+    vendor.add('lib')

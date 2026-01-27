@@ -4,46 +4,167 @@ Created on 05.04.2013
 
 @author: sysoev
 '''
-from google.appengine.ext import db
-from google.appengine.api import users
-from google.appengine.api import images
-
+from contextlib import contextmanager
 import datetime
 import json
-import loqc
 import re
+import functools
 
-def force_unicode(string):
-    if type(string) == unicode:
-        return string
-    return string.decode('utf-8')
+import users_compat as users
+from google.cloud import ndb
 
-class Project(db.Model):
-    name = db.StringProperty(multiline = False)
-    description = db.TextProperty()
-    user = db.UserProperty(auto_current_user = True)
-    created = db.DateTimeProperty(auto_now_add = True)
-    updated = db.DateTimeProperty(auto_now = True)
-    published = db.BooleanProperty(default = False)
-    png = db.TextProperty() 
+import loqc
 
+def force_unicode(value):
+    if isinstance(value, str):
+        return value
+    if isinstance(value, bytes):
+        return value.decode('utf-8')
+    return str(value)
+
+
+def current_user_email():
+    user = users.get_current_user()
+    if not user:
+        return None
+    if hasattr(user, "email") and callable(user.email):
+        return user.email()
+    return force_unicode(user)
+
+
+def normalize_user_value(value):
+    if not value:
+        return None
+    if isinstance(value, str):
+        return value
+    if isinstance(value, bytes):
+        return value.decode("utf-8")
+    if hasattr(value, "email") and callable(value.email):
+        return value.email()
+    if isinstance(value, dict):
+        email = value.get("email") or value.get("Email")
+        if email:
+            return force_unicode(email)
+    return None
+
+
+ndb_client = ndb.Client()
+
+
+@contextmanager
+def ndb_context():
+    try:
+        ndb.get_context()
+    except Exception:
+        with ndb_client.context():
+            yield
+    else:
+        yield
+
+
+def with_ndb_context(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        with ndb_context():
+            return func(*args, **kwargs)
+    return wrapper
+
+
+_LEGACY_KEY_TOKEN = re.compile(
+    r"(u?'[^']*'|u?\"[^\"]*\"|-?\d+)"
+)
+
+
+def _parse_legacy_key_string(value):
+    if not value or not value.startswith("Key(") or not value.endswith(")"):
+        return None
+    inner = value[4:-1].strip()
+    if not inner:
+        return None
+    tokens = []
+    for match in _LEGACY_KEY_TOKEN.finditer(inner):
+        token = match.group(0)
+        if token.startswith(("u'", 'u"')):
+            token = token[1:]
+        if token.startswith(("'", '"')) and token.endswith(("'", '"')):
+            tokens.append(token[1:-1])
+        else:
+            try:
+                tokens.append(int(token))
+            except ValueError:
+                return None
+    if len(tokens) < 2 or len(tokens) % 2 != 0:
+        return None
+    try:
+        return ndb.Key(*tokens)
+    except Exception:
+        return None
+
+
+def key_from_str(key_str):
+    if isinstance(key_str, ndb.Key):
+        return key_str
+    if key_str is None:
+        return None
+    value = force_unicode(key_str).strip()
+    if not value:
+        return None
+    try:
+        return ndb.Key(urlsafe=value)
+    except Exception:
+        return _parse_legacy_key_string(value)
+
+
+def key_to_str(key):
+    if not key:
+        return ""
+    return key.urlsafe().decode("utf-8")
+
+class BaseModel(ndb.Model):
+    @classmethod
+    def get(cls, key):
+        key_obj = key_from_str(key)
+        if not key_obj:
+            return None
+        return key_obj.get()
+
+
+class Project(BaseModel):
+    name = ndb.StringProperty()
+    description = ndb.TextProperty()
+    user = ndb.StringProperty()
+    created = ndb.DateTimeProperty(auto_now_add=True)
+    updated = ndb.DateTimeProperty(auto_now=True)
+    published = ndb.BooleanProperty(default=False)
+    png = ndb.TextProperty()
+
+@with_ndb_context
 def getParentProject():
-    proj = db.GqlQuery("SELECT * FROM Project WHERE name = :1", 'ParentOfAllProjects3717481125').fetch(1)
+    proj = Project.query(Project.name == 'ParentOfAllProjects3717481125').fetch(1)
     if not proj:
         proj = Project(name="ParentOfAllProjects3717481125", description="This is not a project")
         proj.put()
         return proj
-    else:
-        return proj[0]
+    return proj[0]
 
+@with_ndb_context
 def getProjects():
-    return db.GqlQuery("SELECT * FROM Project WHERE user = :1", users.get_current_user()).fetch(1000)
-def getAllProjects():
-    return db.GqlQuery("SELECT * FROM Project").fetch(10000)
+    user_email = current_user_email()
+    if not user_email:
+        return []
+    return Project.query(Project.user == user_email).fetch(1000)
 
+
+@with_ndb_context
+def getAllProjects():
+    return Project.query().fetch(10000)
+
+@with_ndb_context
 def PublishProject(project_key, png):
     proj = Project.get(project_key)
-    if proj.user != users.get_current_user():
+    if not proj:
+        return 'No project'
+    if proj.user != current_user_email():
         return 'Not authorized!'
     if proj.published:
         proj.published = False
@@ -56,9 +177,12 @@ def PublishProject(project_key, png):
     proj.put()
     return 'OK'
 
+@with_ndb_context
 def GetMatrices(project_key):
     proj = Project.get(project_key)
-    if proj.user != users.get_current_user():
+    if not proj:
+        return json.dumps('No project')
+    if proj.user != current_user_email():
         return json.dumps('Not authorized!')
     circ = GetCircuit(project_key)
     if not circ:
@@ -67,7 +191,7 @@ def GetMatrices(project_key):
         return json.dumps('Project is not ready. Simulate it first')
     res = "Direct: " + circ.matrix.replace("[[", "\\( \\begin{pmatrix}").replace("]]", "\\end{pmatrix} \\)").replace("]&", "\\\\").replace("]", "\\\\").replace("[", "").replace("\n", " ")
     res_inv = "Inverse: " + circ.inv.replace("[[", "\\( \\begin{pmatrix}").replace("]]", "\\end{pmatrix} \\)").replace("]&", "\\\\").replace("]", "\\\\").replace("[", "").replace("\n", " ")
-    
+
     regex = re.compile(r"[+-]0\.0+e\+00j", re.IGNORECASE)
     res = regex.sub("", res)
     res_inv = regex.sub("", res_inv)
@@ -85,20 +209,23 @@ def GetMatrices(project_key):
     res_inv = regex.sub("", res_inv)
     return json.dumps("<br><br>" + res + "<br><br><br> " + res_inv + "<br><br>", default=str)
 
+@with_ndb_context
 def CopyProject(project_key):
     try:
         proj = Project.get(project_key)
+        if not proj:
+            return 'No project'
         if not proj.published:
             return 'You can\'t copy an un-published project!'
         parent_project = getParentProject()
-        new_proj = Project(parent = parent_project.key())
+        new_proj = Project(parent=parent_project.key)
         new_proj.name = 'Copy of ' + proj.name
         new_proj.description = proj.description
         new_proj.put()
-    
-        objects = db.GqlQuery("SELECT * FROM LODevice WHERE ANCESTOR is :1", proj).fetch(1000)
+
+        objects = LODevice.query(ancestor=proj.key).fetch(1000)
         for o in objects:
-            new_device = LODevice(parent = new_proj.key())
+            new_device = LODevice(parent=new_proj.key)
             new_device.id = o.id
             new_device.type = o.type
             new_device.input_type = o.input_type
@@ -109,19 +236,19 @@ def CopyProject(project_key):
             new_device.y = o.y
             new_device.project_key = o.project_key
             new_device.put()
-        conns = db.GqlQuery("SELECT * FROM LOConnection WHERE ANCESTOR is :1", proj).fetch(1000)
+        conns = LOConnection.query(ancestor=proj.key).fetch(1000)
         for c in conns:
-            new_conn = LOConnection(parent = new_proj.key())
+            new_conn = LOConnection(parent=new_proj.key)
             new_conn.line_json = c.line_json
             new_conn.put()
         return 'Project is copied!'
     except Exception as ex:
-        return str(ex)    
+        return str(ex)
 
+@with_ndb_context
 def GetLibrary():
-    projects = Project.all()
-    projects.filter("published = ", True)
-    res = [{'key': p.key(), 'name': p.name, 'descr': p.description, 'user': p.user} for p in projects]    
+    projects = Project.query(Project.published == True).fetch()
+    res = [{'key': key_to_str(p.key), 'name': p.name, 'descr': p.description, 'user': p.user} for p in projects]
     return json.dumps(res, default=str)
 
 '''
@@ -131,65 +258,79 @@ def GetLibrary():
 '''
 object_types = ['Project', 'LODevice', 'LOConnection', 'LOCircuit']
 
-def CallCheck(project_key = None):
-    user = users.get_current_user()
-    if not user:
+@with_ndb_context
+def CallCheck(project_key=None):
+    user_email = current_user_email()
+    if not user_email:
         return False
     if project_key:
         proj = Project.get(project_key)
-        if proj.user != users.get_current_user():
+        if not proj:
+            return False
+        if proj.user != user_email:
             return False
     return True
 
+@with_ndb_context
 def GetObjectByKey(object_type, key):
     try:
         if not CallCheck():
             return
         if object_type not in object_types:
             return
-        gql_string = "SELECT * FROM " + object_type + " WHERE __key__ = KEY(:1) AND name != :2"
-        objs = db.GqlQuery(gql_string, key, "ParentOfAllProjects3717481125").fetch(1)
-        if objs:
-            return json.dumps(objs[0]._entity, default=str)
-        else:
-            return json.dumps({})
+        data_class = globals()[object_type]
+        obj = data_class.get(key)
+        if obj and getattr(obj, "name", None) != "ParentOfAllProjects3717481125":
+            return json.dumps(obj.to_dict(), default=str)
+        return json.dumps({})
     except Exception as ex:
         return str(ex)
 
+@with_ndb_context
 def CycleObjects(object_type, parent_key):
     try:
         if not CallCheck():
             return
         if object_type not in object_types:
             return
+        data_class = globals()[object_type]
         if parent_key == "current_user":
-            parent_key = users.get_current_user()
+            parent_key = current_user_email()
+            if not parent_key:
+                return json.dumps([])
             parent_project = getParentProject()
-            gql_string = "SELECT * FROM " + object_type + " WHERE user = :1 AND ANCESTOR is :2 AND name != :3"
-            objs = db.GqlQuery(gql_string, parent_key, parent_project.key(), "ParentOfAllProjects3717481125").fetch(1000)
+            objs = data_class.query(
+                data_class.user == parent_key,
+                ancestor=parent_project.key
+            ).fetch(1000)
+            objs = [o for o in objs if getattr(o, "name", None) != "ParentOfAllProjects3717481125"]
         else:
-            gql_string = "SELECT * FROM " + object_type + " WHERE ANCESTOR is :1"
-            objs = db.GqlQuery(gql_string, parent_key).fetch(1000)
+            ancestor_key = key_from_str(parent_key)
+            if not ancestor_key:
+                return json.dumps([])
+            objs = data_class.query(ancestor=ancestor_key).fetch(1000)
         if objs:
-            return json.dumps([[str(e.key()), e._entity] for e in objs], default=str)
-        else:
-            return json.dumps([])
+            return json.dumps([[key_to_str(e.key), e.to_dict()] for e in objs], default=str)
+        return json.dumps([])
     except Exception as ex:
         return str(ex)
 
+@with_ndb_context
 def DeleteCycleObject(key, object_type):
     try:
         if not CallCheck():
             return
         if object_type not in object_types:
             return
-        gql_string = "SELECT * FROM " + object_type + " WHERE __key__ = KEY(:1) AND name != :2"
-        objs = db.GqlQuery(gql_string, key, "ParentOfAllProjects3717481125").fetch(1)
-        objs[0].delete()
+        data_class = globals()[object_type]
+        obj = data_class.get(key)
+        if obj and getattr(obj, "name", None) != "ParentOfAllProjects3717481125":
+            obj.key.delete()
         return 'OK'
     except Exception as ex:
         return str(ex)
 
+@with_ndb_context
 def AddCycleObject(data, object_type, parent_key):
     try:
         if not CallCheck():
@@ -197,37 +338,42 @@ def AddCycleObject(data, object_type, parent_key):
         if object_type not in object_types:
             return
         obj = json.loads(data)
-        dataClass = globals()[object_type]
+        data_class = globals()[object_type]
         if parent_key == "current_user":
             parent_project = getParentProject()
-            instance = dataClass(parent = parent_project.key())
+            instance = data_class(parent=parent_project.key)
         else:
             # check rights
             proj = Project.get(parent_key)
-            if proj.user != users.get_current_user():
+            if not proj:
+                return 'No project'
+            if proj.user != current_user_email():
                 return 'Not authorized'
-            instance = dataClass(parent = db.Key(parent_key))
+            instance = data_class(parent=key_from_str(parent_key))
         for key in obj:
             setattr(instance, key, obj[key])
+        if object_type == "Project" and not getattr(instance, "user", None):
+            instance.user = current_user_email()
         instance.put()
         return 'OK'
     except Exception as ex:
         return str(ex)
 
 # It is used only for projects! Hence the security check
+@with_ndb_context
 def EditCycleObject(key, data, object_type):
     try:
         if not CallCheck():
             return
         # check rights
         proj = Project.get(key)
-        if proj.user != users.get_current_user():
-            return 'Not authorized'            
+        if proj.user != current_user_email():
+            return 'Not authorized'
         if object_type not in object_types:
             return
         obj = json.loads(data)
-        dataClass = globals()[object_type]
-        instance = dataClass.get(key)
+        data_class = globals()[object_type]
+        instance = data_class.get(key)
         if getattr(instance, "name") == "ParentOfAllProjects3717481125":
             return 'Wrong key'
         for k in obj:
@@ -236,35 +382,62 @@ def EditCycleObject(key, data, object_type):
         return 'OK'
     except Exception as ex:
         return str(ex)
+
+
+@with_ndb_context
+def MigrateProjectUsers(fallback_email=None, limit=1000):
+    try:
+        projects = Project.query().fetch(limit)
+        updated = 0
+        skipped = 0
+        for proj in projects:
+            normalized = normalize_user_value(proj.user)
+            if not normalized and fallback_email:
+                normalized = fallback_email
+            if not normalized:
+                skipped += 1
+                continue
+            if proj.user != normalized:
+                proj.user = normalized
+                proj.put()
+                updated += 1
+        return json.dumps({"updated": updated, "skipped": skipped, "total": len(projects)}, default=str)
+    except Exception as ex:
+        return json.dumps({"error": True, "data": str(ex)}, default=str)
         
 '''
 '     LOQC Data 
 '
 '
 '''
-class LODevice(db.Model):
-    id = db.StringProperty(multiline = False)
-    type = db.StringProperty(multiline = False)
-    theta = db.StringProperty(multiline = False)
-    phi = db.StringProperty(multiline = False)
-    n = db.StringProperty(multiline = False)
-    input_type = db.StringProperty(multiline = False, default = "0")
-    x = db.IntegerProperty(default = 100)
-    y = db.IntegerProperty(default = 100)
-    project_key = db.StringProperty(multiline = False) 
-class LOConnection(db.Model):
-    line_json = db.TextProperty()
-class LOCircuit(db.Model):
-    name = db.StringProperty(multiline = False)
-    modes = db.IntegerProperty()
-    matrix = db.TextProperty()
-    inv = db.TextProperty()
-    result = db.TextProperty()
-    fidelities = db.TextProperty()
-    cgate_run_x = db.TextProperty()
-    cgate_run_y = db.TextProperty()
-    cgate_run_z = db.TextProperty()
+class LODevice(BaseModel):
+    id = ndb.StringProperty()
+    type = ndb.StringProperty()
+    theta = ndb.StringProperty()
+    phi = ndb.StringProperty()
+    n = ndb.StringProperty()
+    input_type = ndb.StringProperty(default="0")
+    x = ndb.IntegerProperty(default=100)
+    y = ndb.IntegerProperty(default=100)
+    project_key = ndb.StringProperty()
 
+
+class LOConnection(BaseModel):
+    line_json = ndb.TextProperty()
+
+
+class LOCircuit(BaseModel):
+    name = ndb.StringProperty()
+    modes = ndb.IntegerProperty()
+    matrix = ndb.TextProperty()
+    inv = ndb.TextProperty()
+    result = ndb.TextProperty()
+    fidelities = ndb.TextProperty()
+    cgate_run_x = ndb.TextProperty()
+    cgate_run_y = ndb.TextProperty()
+    cgate_run_z = ndb.TextProperty()
+
+@with_ndb_context
 def ClearProjectDesign(key):
     try:
         proj = Project.get(key)
@@ -272,15 +445,15 @@ def ClearProjectDesign(key):
             return "No project"
         if proj.user != users.get_current_user():
             return "Not authorized"
-        objects = db.GqlQuery("SELECT * FROM LODevice WHERE ANCESTOR is :1", proj).fetch(1000)
+        objects = LODevice.query(ancestor=proj.key).fetch(1000)
         for o in objects:
-            o.delete()
-        conns = db.GqlQuery("SELECT * FROM LOConnection WHERE ANCESTOR is :1", proj).fetch(1000)
+            o.key.delete()
+        conns = LOConnection.query(ancestor=proj.key).fetch(1000)
         for c in conns:
-            c.delete()
-        circuit = db.GqlQuery("SELECT * FROM LOCircuit WHERE ANCESTOR is :1", proj).fetch(1000)
+            c.key.delete()
+        circuit = LOCircuit.query(ancestor=proj.key).fetch(1000)
         for c in circuit:
-            c.delete()            
+            c.key.delete()
         return "OK"
     except Exception as ex:
         return str(ex)
@@ -294,6 +467,8 @@ def ProcessConns(conns, devices):
         source_port = con[0]['source']['port']
         target_node = con[0]['target']['node']
         target_port = con[0]['target']['port']
+        source_dev = None
+        target_dev = None
         for d in devs:
             if d['id'] == source_node:
                 source_dev = d
@@ -394,19 +569,20 @@ def ProcessDevMode(dev, devs, processed_devs):
                 ProcessDevMode(source, devs, processed_devs)
             mode['mode'] = source_mode['mode']
             
+@with_ndb_context
 def GetCircuit(project_key):
     try:
         proj = Project.get(project_key)
         if not proj:
             return None
-        circuit = db.GqlQuery("SELECT * FROM LOCircuit WHERE ANCESTOR is :1", proj).fetch(1)
+        circuit = LOCircuit.query(ancestor=proj.key).fetch(1)
         if not circuit:
             return None
         if len(circuit) == 0:
             return None
-        return circuit[0]            
-    except Exception as ex:
-        return None            
+        return circuit[0]
+    except Exception:
+        return None
 
 def ProcessModes(devs):
     # sort inputs from top to bottom
@@ -452,32 +628,39 @@ def ProcessModes(devs):
     # check passed!
     return len(ins)
 
+@with_ndb_context
 def getDevsModes(proj):
     try:
-        devices = db.GqlQuery("SELECT * FROM LODevice WHERE ANCESTOR is :1", proj).fetch(1000)
-        conns = db.GqlQuery("SELECT * FROM LOConnection WHERE ANCESTOR is :1", proj).fetch(1000)
+        devices = LODevice.query(ancestor=proj.key).fetch(1000)
+        conns = LOConnection.query(ancestor=proj.key).fetch(1000)
 
         devs = ProcessConns(conns, devices)
         if not devs:
             return None, None, json.dumps("The circuit didn't pass the completeness check! It might lack inputs/outputs or it is recursive")
         ProcessSteps(devs)
-        modes = ProcessModes(devs) 
+        modes = ProcessModes(devs)
         if modes == 0:
             return None, None, json.dumps("The circuit didn't pass the completeness check! It might lack inputs/outputs or it is recursive")
         return devs, modes, ""
     except Exception as ex:
         return None, None, str(ex)
 
+@with_ndb_context
 def ConstructCircuit(project_key):
     try:
         proj = Project.get(project_key)
         if not proj:
             return "No project"
-        if proj.user != users.get_current_user():
+        user_email = current_user_email()
+        proj_user = normalize_user_value(proj.user)
+        if proj_user and proj_user != user_email:
             return "Not authorized"
+        if not proj_user and user_email:
+            proj.user = user_email
+            proj.put()
 
         # check if we already did the calculation
-        circuit = db.GqlQuery("SELECT * FROM LOCircuit WHERE ANCESTOR is :1", proj).fetch(1)
+        circuit = LOCircuit.query(ancestor=proj.key).fetch(1)
         if circuit:
             return json.dumps(circuit[0].result, default=str)
 
@@ -503,7 +686,7 @@ def ConstructCircuit(project_key):
             res += res_m[:-1] + "+"
 
         # save result
-        circ = LOCircuit(parent = proj.key())
+        circ = LOCircuit(parent=proj.key)
         circ.modes = modes
         circ.matrix = matrix
         circ.inv = inv
@@ -513,7 +696,7 @@ def ConstructCircuit(project_key):
         #    circ.result += cgate_res
         circ.name = proj.name
         circ.put()
-        
+
         return json.dumps(circ.result, default=str)
     except Exception as ex:
         return str(ex)
