@@ -221,6 +221,7 @@ def CopyProject(project_key):
         new_proj = Project(parent=parent_project.key)
         new_proj.name = 'Copy of ' + proj.name
         new_proj.description = proj.description
+        new_proj.user = current_user_email()
         new_proj.put()
 
         objects = LODevice.query(ancestor=proj.key).fetch(1000)
@@ -443,7 +444,7 @@ def ClearProjectDesign(key):
         proj = Project.get(key)
         if not proj:
             return "No project"
-        if proj.user != users.get_current_user():
+        if proj.user != current_user_email():
             return "Not authorized"
         objects = LODevice.query(ancestor=proj.key).fetch(1000)
         for o in objects:
