@@ -1,0 +1,116 @@
+Optical Walk Designer (ow_designer.html) — required server endpoints
+====================================================================
+
+The designer reuses several existing LOQC handlers where behavior is identical.
+New backend pieces are noted under "Server changes required".
+
+
+1. GET /ow_designer/
+   Purpose: Serve the Optical Walk designer page inside an iframe (same pattern as /lo_designer/).
+   Query parameters:
+     - id (string): Project entity key. Use id=0 to return an empty page when no project is selected.
+   Response: Rendered ow_designer.html with template variable project_key set to id.
+   Auth: Logged-in user required (same as LODesigner).
+   Implemented: OWDesigner in main.py, route ('/ow_designer/', OWDesigner).
+
+
+2. GET /clear_ow_design/
+   Purpose: Delete all OW graph data for a project before a full save (replace-all save strategy).
+   Query parameters:
+     - id (string): Project key.
+   Response: "OK" on success, or an error string ("No project", "Not authorized", etc.).
+   Auth: Current user must own the project.
+   Implemented: ClearOWDesign in main.py, data.ClearOWDesign() (OWDevice + OWConnection only).
+
+
+3. GET /cycle_objects/  (existing endpoint)
+   Purpose: Load saved figures or connections for the project.
+   Query parameters:
+     - object_type (string): "OWDevice" or "OWConnection"
+     - parent_key (string): Project key
+   Response: JSON array of [entity_key, field_dict] pairs, same format as for LODevice/LOConnection.
+   Auth: CallCheck() — logged-in user.
+   Implemented: OWDevice and OWConnection in data.py object_types and as ndb models.
+
+
+4. POST /add_cycle_object/  (existing endpoint)
+   Purpose: Persist one figure or one connection after /clear_ow_design/ during Save.
+   Form/body parameters:
+     - parent_key (string): Project key
+     - object_type (string): "OWDevice" or "OWConnection"
+     - data (string): JSON object
+   Response: "OK" or error string.
+   Auth: User must own parent project.
+
+   OWDevice JSON (POST data field), one object per figure:
+     {
+       "id": "<draw2d figure id>",
+       "type": "IN" | "Q",
+       "index": "<integer as string, -1 if unset>",
+       "angle": "<float degrees as string>",
+       "result": "0" | "1",
+       "x": <integer>,
+       "y": <integer>
+     }
+
+   OWConnection JSON (POST data field):
+     {
+       "line_json": "<stringified JSON array — same draw2d Connection format as LOConnection>"
+     }
+     The inner array has one element with source/target node ids and port names,
+     Manhattan router, vertices, etc. (identical to lo_designer.html export/save format).
+
+   Suggested ndb models:
+     class OWDevice(BaseModel):
+         id = ndb.StringProperty()
+         type = ndb.StringProperty()      # "IN" or "Q"
+         index = ndb.StringProperty()
+         angle = ndb.StringProperty()
+         result = ndb.StringProperty()      # "0" or "1"
+         x = ndb.IntegerProperty(default=100)
+         y = ndb.IntegerProperty(default=100)
+
+     class OWConnection(BaseModel):
+         line_json = ndb.TextProperty()
+
+
+5. GET /get_object_by_key/  (existing endpoint)
+   Purpose: Read project metadata on load (e.g. published flag to hide Save / toggle Publish label).
+   Query parameters:
+     - object_type: "Project"
+     - key: project key
+   Response: JSON project dict (field "published" is used by the designer).
+   No server changes required.
+
+
+6. POST /publish_project/  (existing endpoint)
+   Purpose: Publish or unpublish the project and store a PNG snapshot of the canvas.
+   Body parameters:
+     - key: project key
+     - png: base64 PNG data URL from draw2d.io.png.Writer
+   Response: "OK" or error message.
+   No server changes required (shared with linear optics designer).
+
+
+Optional (not used by ow_designer.html today, but useful for parity / future UI)
+--------------------------------------------------------------------------------
+
+7. GET /delete_cycle_object/  (existing)
+   Delete a single OWDevice or OWConnection by key if you add per-object delete in the UI later.
+
+8. POST /update_cycle_object/  (existing)
+   Incremental update of one entity; Save currently uses clear + bulk add instead.
+
+
+Client-side export/import (no server)
+-------------------------------------
+Export writes a local file ow_design.txt with:
+  { "objects": [...], "connections": [...] }
+Import reads that file and restores the canvas without calling the server.
+
+
+Connection model vs lo_designer
+-------------------------------
+- Each IN/Q node has one hybrid port (whole shape is connectable).
+- Ports are not hidden after connect; maxFanOut is unlimited.
+- Multiple edges may attach to the same node (general graph).

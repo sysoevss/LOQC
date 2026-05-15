@@ -139,6 +139,22 @@ class ClearDesign(BaseHandler):
     def get(self):
         project_key = self.request.get('id')
         self.response.write(data.ClearProjectDesign(project_key))
+class OWDesigner(BaseHandler):
+    def get(self):
+        user = users.get_current_user()
+        if not user:
+            self.response.write("Re-login please")
+        else:
+            project_key = self.request.get('id')
+            if project_key == "0":
+                self.response.write("<html></html>")
+            else:
+                template_values = {'project_key': project_key}
+                self.response.write(_render_template('ow_designer.html', template_values))
+class ClearOWDesign(BaseHandler):
+    def get(self):
+        project_key = self.request.get('id')
+        self.response.write(data.ClearOWDesign(project_key))
 class Simulate(BaseHandler):
     def get(self):
         project_key = self.request.get('project_key')
@@ -195,7 +211,9 @@ application = webapp2.WSGIApplication([('/', MainPage),
                                        ('/delete_cycle_object/', DeleteCycleObject),
                                        ('/update_cycle_object/', EditCycleObject), 
                                        ('/lo_designer/', LODesigner),
+                                       ('/ow_designer/', OWDesigner),
                                        ('/clear_design/', ClearDesign),
+                                       ('/clear_ow_design/', ClearOWDesign),
                                        ('/simulate/', Simulate),
                                        ('/simulate_cgate/', SimulateCGate),
                                        ('/publish_project/', PublishProject),

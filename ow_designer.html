@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Optical Walk Designer">
+    <meta name="author" content="Sergey Sysoev">
+<link href="/css/bootstrap.min.css" rel="stylesheet">
+<style>
+hr {margin: 10px 0px 0px 0px}
+body {margin: 10px}
+a.loqc_button:link, a.loqc_button:visited {
+  background-color: rgba(0, 100, 180, 0.7);
+  color: white;
+  padding: 6px 25px;
+  margin: 1px 1px 1px 1px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  width: 120px;
+}
+
+a.loqc_button:hover, a.loqc_button:active {
+  background-color: rgba(0, 100, 180, 0.5);
+}
+a.loqc_button_2:link, a.loqc_button_2:visited {
+  background-color: rgba(0, 140, 160, 0.7);
+  color: white;
+  padding: 7px 25px;
+  margin: 1px 1px 1px 1px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  width: 120px;
+}
+
+a.loqc_button_2:hover, a.loqc_button_2:active {
+  background-color: rgba(0, 140, 160, 0.5);
+}
+
+a.loqc_button_2_inactive:link, a.loqc_button_2_inactive:visited {
+  background-color: rgba(0, 140, 160, 0.3);
+  color: white;
+  padding: 7px 25px;
+  margin: 1px 1px 1px 1px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  width: 120px;
+}
+
+a.loqc_button_2_inactive:hover, a.loqc_button_2_inactive:active {
+  background-color: rgba(0, 140, 160, 0.3);
+}
+
+a.loqc_button_alert:link, a.loqc_button_alert:visited {
+  background-color: rgba(255, 140, 60, 0.7);
+  color: white;
+  padding: 7px 25px;
+  margin: 1px 1px 1px 1px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  width: 120px;
+}
+
+a.loqc_button_alert:hover, a.loqc_button_alert:active {
+  background-color: rgba(255, 140, 60, 0.5);
+}
+
+body {
+    height: 100%;
+    background-color: #fff;
+}
+</style>
+
+	<script type="text/javascript" src="/js/jquery-1.8.2.min.js"></script>
+	<script type="text/javascript" src="/js/jquery.form.min.js"></script>
+	<script type="text/javascript" src="/js/jquery-ui.min.js"></script>
+
+    <script src="/js/draw2d.js"></script>
+<script type="text/javascript">
+
+var canvas;
+var cur_figure;
+var FIGURE_TYPES = ["IN", "Q"];
+
+function download(data, filename) {
+    var file = new Blob([data], {type: 'text/plain'});
+    if (window.navigator.msSaveOrOpenBlob)
+        window.navigator.msSaveOrOpenBlob(file, filename);
+    else {
+        var a = document.createElement("a"),
+                url = URL.createObjectURL(file);
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(function() {
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }, 0);
+    }
+}
+
+function makeid(length) {
+    var result = '';
+    var characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    var charactersLength = characters.length;
+    for (var i = 0; i < length; i++) {
+      result += characters.charAt(Math.floor(Math.random() * charactersLength));
+    }
+    return result;
+}
+
+function markUnsaved() {
+    $("#save").removeClass("loqc_button_2_inactive");
+    $("#save").addClass("loqc_button_alert");
+}
+
+function resolveClickedFigure(figure) {
+    if (figure == null) {
+        return null;
+    }
+    if (FIGURE_TYPES.indexOf(figure["type"]) >= 0) {
+        return figure;
+    }
+    if (figure.parent && FIGURE_TYPES.indexOf(figure.parent["type"]) >= 0) {
+        return figure.parent;
+    }
+    return null;
+}
+
+function setupUnlimitedConnections(figure) {
+    var port = figure.createPort("hybrid", new draw2d.layout.locator.CenterLocator());
+    port.setMaxFanOut(Number.MAX_SAFE_INTEGER);
+    port.setConnectionAnchor(new draw2d.layout.anchor.ShortesPathConnectionAnchor(port));
+    port.setVisible(false);
+    port.setVisible = function () {};
+    figure.delegateTarget = function (draggedFigure) {
+        return port.delegateTarget(draggedFigure);
+    };
+    figure.graphPort = port;
+    return port;
+}
+
+function formatIndexLabel(index) {
+    if (index === -1 || index === "" || index === null || typeof index === "undefined") {
+        return "-";
+    }
+    return parseInt(index, 10);
+}
+
+function updateFigureLabel(fig) {
+    var idxText = formatIndexLabel(fig["index"]);
+    var ang = parseFloat(fig["angle"]);
+    if (isNaN(ang)) {
+        ang = 0;
+    }
+    fig.label.text = idxText + "\n" + ang.toFixed(1) + "\u00b0\n" + fig["result"];
+    fig.label.repaint();
+}
+
+function showFigureControls(fig) {
+    cur_figure = fig;
+    $("#controls").show();
+    if (fig["index"] === -1 || fig["index"] === "" || fig["index"] === null || typeof fig["index"] === "undefined") {
+        $("#index_input").val("");
+    } else {
+        $("#index_input").val(parseInt(fig["index"], 10));
+    }
+    $("#angle_input").val(parseFloat(fig["angle"]));
+    $("#result_input").val(String(fig["result"]));
+}
+
+InputFigure = draw2d.shape.basic.Polygon.extend({
+    init: function(attr) {
+        this._super($.extend({bgColor:{red: 100, green: 170, blue: 255, alpha: 0.5}, color:"#1B1B1B"}, attr));
+        this.resetVertices();
+        var box = this.getBoundingBox();
+        this.addVertex(0, 0);
+        this.addVertex(box.w, box.h / 2);
+        this.addVertex(0, box.h);
+        this.installEditPolicy(new draw2d.policy.figure.RectangleSelectionFeedbackPolicy());
+        this.setPosition(box.getTopLeft());
+    }
+});
+
+document.addEventListener("DOMContentLoaded", function () {
+
+    canvas = new draw2d.Canvas("gfx_holder");
+    $("svg").css('left', '');
+    $("svg").css('top', '');
+
+    canvas.installEditPolicy(new draw2d.policy.canvas.ShowGridEditPolicy());
+    canvas.installEditPolicy(new draw2d.policy.canvas.SnapToGeometryEditPolicy());
+    canvas.installEditPolicy(new draw2d.policy.canvas.SnapToInBetweenEditPolicy());
+    canvas.installEditPolicy(new draw2d.policy.canvas.SnapToCenterEditPolicy());
+
+    canvas.setScrollArea($('#gfx_holder'));
+    canvas.fromDocumentToCanvasCoordinate = $.proxy(function(x, y) {
+        return new draw2d.geo.Point(
+                (x - this.getAbsoluteX() + $(document).scrollLeft()) * this.zoomFactor / $('svg')[0].currentScale,
+                (y - this.getAbsoluteY() + $(document).scrollTop()) * this.zoomFactor / $('svg')[0].currentScale);
+    }, canvas);
+    canvas.fromCanvasToDocumentCoordinate = $.proxy(function(x, y) {
+        return new draw2d.geo.Point(
+                ((x * (1 / (this.zoomFactor / $('svg')[0].currentScale))) + this.getAbsoluteX() - $(document).scrollLeft()),
+                ((y * (1 / (this.zoomFactor / $('svg')[0].currentScale))) + this.getAbsoluteY() - $(document).scrollTop()));
+    }, canvas);
+
+    canvas.getCommandStack().addEventListener(function(e) {
+        if (e.isPostChangeEvent()) {
+            markUnsaved();
+        }
+    });
+
+    canvas.installEditPolicy(new draw2d.policy.canvas.CanvasPolicy({
+        onClick: function(figure) {
+            var fig = resolveClickedFigure(figure);
+            if (fig) {
+                showFigureControls(fig);
+            } else {
+                $("#controls").hide();
+                cur_figure = null;
+            }
+        }
+    }));
+    canvas.on("unselect", function() {
+        $("#controls").hide();
+        cur_figure = null;
+    });
+
+    var createConnection = function() {
+        var con = new draw2d.Connection();
+        con.setRouter(new draw2d.layout.connection.ManhattanConnectionRouter());
+        return con;
+    };
+    canvas.installEditPolicy(new draw2d.policy.connection.DragConnectionCreatePolicy({
+        createConnection: createConnection
+    }));
+
+    function add_in(x, y, index, angle, result, id) {
+        var d = new InputFigure({x: x, y: y, width: 50, height: 50});
+        d["type"] = "IN";
+        d["index"] = index;
+        d["angle"] = angle;
+        d["result"] = result;
+        if (id) {
+            d["id"] = id;
+        }
+        d.label = new draw2d.shape.basic.Label({text: "", fontColor: "#0d0d0d", stroke: 0});
+        d.add(d.label, new draw2d.layout.locator.CenterLocator(d));
+        setupUnlimitedConnections(d);
+        updateFigureLabel(d);
+        canvas.add(d);
+    }
+
+    function add_q(x, y, index, angle, result, id) {
+        var d = new draw2d.shape.basic.Oval({x: x, y: y, width: 50, height: 50});
+        d.setBackgroundColor({red: 255, green: 200, blue: 120, alpha: 0.6});
+        d.setColor("#1B1B1B");
+        d["type"] = "Q";
+        d["index"] = index;
+        d["angle"] = angle;
+        d["result"] = result;
+        if (id) {
+            d["id"] = id;
+        }
+        d.label = new draw2d.shape.basic.Label({text: "", fontColor: "#0d0d0d", stroke: 0});
+        d.add(d.label, new draw2d.layout.locator.CenterLocator(d));
+        setupUnlimitedConnections(d);
+        updateFigureLabel(d);
+        canvas.add(d);
+    }
+
+    $("#add_in").click(function(e) {
+        e.preventDefault();
+        add_in(100, 100, 0, 0.0, "0", null);
+        markUnsaved();
+    });
+    $("#add_q").click(function(e) {
+        e.preventDefault();
+        add_q(100, 100, 0, 0.0, "0", null);
+        markUnsaved();
+    });
+
+    function serialize_object(el, suffix) {
+        suffix = suffix || "";
+        return {
+            id: el.id + suffix,
+            type: el.type,
+            index: String(el.index),
+            angle: String(el.angle),
+            result: String(el.result),
+            x: Math.round(el.x),
+            y: Math.round(el.y)
+        };
+    }
+
+    function serialize_connection(el, suffix) {
+        suffix = suffix || "";
+        return [{
+            type: "draw2d.Connection",
+            id: el.id + suffix,
+            alpha: 1,
+            selectable: true,
+            draggable: true,
+            angle: 0,
+            userData: {},
+            cssClass: "draw2d_Connection",
+            stroke: 2,
+            color: "rgba(18,156,228,1)",
+            outlineStroke: 0,
+            outlineColor: "rgba(0,0,0,0)",
+            policy: "draw2d.policy.line.VertexSelectionFeedbackPolicy",
+            vertex: el.vertices.data,
+            router: "draw2d.layout.connection.ManhattanConnectionRouter",
+            radius: 3,
+            source: {
+                node: el.getSource().parent.id + suffix,
+                port: el.sourcePort.name
+            },
+            target: {
+                node: el.getTarget().parent.id + suffix,
+                port: el.targetPort.name
+            }
+        }];
+    }
+
+    $("#save").click(function(e) {
+        e.preventDefault();
+        $.get('/clear_ow_design/', {id: '{{ project_key }}'}, function() {
+            canvas.figures.data.forEach(function(el) {
+                $.post('/add_cycle_object/', {
+                    parent_key: '{{ project_key }}',
+                    object_type: "OWDevice",
+                    data: JSON.stringify(serialize_object(el))
+                });
+            });
+            canvas.lines.data.forEach(function(el) {
+                $.post('/add_cycle_object/', {
+                    parent_key: '{{ project_key }}',
+                    object_type: "OWConnection",
+                    data: JSON.stringify({line_json: JSON.stringify(serialize_connection(el))})
+                });
+            });
+            $("#save").removeClass("loqc_button_alert");
+            $("#save").addClass("loqc_button_2_inactive");
+        });
+    });
+
+    $("#export").click(function(e) {
+        e.preventDefault();
+        var exp_objects = [];
+        var exp_connections = [];
+        var random_suffix = makeid(16);
+        canvas.figures.data.forEach(function(el) {
+            exp_objects.push(serialize_object(el, random_suffix));
+        });
+        canvas.lines.data.forEach(function(el) {
+            exp_connections.push(serialize_connection(el, random_suffix));
+        });
+        download(JSON.stringify({objects: exp_objects, connections: exp_connections}), "ow_design.txt");
+    });
+
+    $("#import").click(function(e) {
+        e.preventDefault();
+        var input = document.createElement('input');
+        input.type = 'file';
+        input.onchange = function(ev) {
+            var file = ev.target.files[0];
+            var reader = new FileReader();
+            reader.readAsText(file, 'UTF-8');
+            reader.onload = function(readerEvent) {
+                var data = JSON.parse(readerEvent.target.result);
+                var reader_json = new draw2d.io.json.Reader();
+                data.objects.forEach(function(el) { load_object([0, el]); });
+                data.connections.forEach(function(el) {
+                    reader_json.unmarshal(canvas, [el[0]]);
+                });
+                markUnsaved();
+            };
+        };
+        input.click();
+    });
+
+    $("#publish").click(function(e) {
+        e.preventDefault();
+        publishProject(canvas);
+    });
+
+    $("#set").click(function(e) {
+        e.preventDefault();
+        if (!cur_figure) {
+            return;
+        }
+        markUnsaved();
+        var index_val = $("#index_input").val();
+        if (index_val === "") {
+            cur_figure["index"] = -1;
+        } else {
+            cur_figure["index"] = parseInt(index_val, 10);
+        }
+        cur_figure["angle"] = $("#angle_input").val();
+        cur_figure["result"] = $("#result_input").val();
+        updateFigureLabel(cur_figure);
+    });
+
+    $("#scale_minus").click(function(e) {
+        e.preventDefault();
+        canvas.setZoom(canvas.getZoom() * 1.1, true);
+    });
+    $("#scale_plus").click(function(e) {
+        e.preventDefault();
+        canvas.setZoom(canvas.getZoom() * 0.91, true);
+    });
+    $("#delete_selection").click(function(e) {
+        e.preventDefault();
+        var to_del = canvas.getSelection().getAll().data;
+        for (var i = to_del.length - 1; i >= 0; i--) {
+            canvas.getCommandStack().execute(new draw2d.command.CommandDelete(to_del[i]));
+        }
+        markUnsaved();
+    });
+    $("#undo").click(function(e) {
+        e.preventDefault();
+        canvas.getCommandStack().undo();
+    });
+    $("#redo").click(function(e) {
+        e.preventDefault();
+        canvas.getCommandStack().redo();
+    });
+
+    function parseLoadedParams(obj) {
+        var index = obj.index;
+        if (typeof index === "undefined" && typeof obj.n !== "undefined") {
+            index = obj.n;
+        }
+        if (index === "" || index === null || typeof index === "undefined") {
+            index = -1;
+        } else {
+            index = parseInt(index, 10);
+        }
+        var angle = parseFloat(obj.angle);
+        if (isNaN(angle)) {
+            angle = 0.0;
+        }
+        var result = String(obj.result);
+        if (result !== "0" && result !== "1") {
+            result = "0";
+        }
+        return {index: index, angle: angle, result: result};
+    }
+
+    function load_object(el) {
+        var obj = el[1];
+        var params = parseLoadedParams(obj);
+        if (obj.type === "IN") {
+            add_in(obj.x, obj.y, params.index, params.angle, params.result, obj.id);
+        }
+        if (obj.type === "Q") {
+            add_q(obj.x, obj.y, params.index, params.angle, params.result, obj.id);
+        }
+    }
+
+    function load_design() {
+        $.get('/get_object_by_key/', {object_type: "Project", key: '{{ project_key }}'}, function(json) {
+            var data = JSON.parse(json);
+            if (data["published"]) {
+                $("#save").hide();
+                $("#publish").html("Unpublish");
+            }
+        });
+        $.get('/cycle_objects/', {object_type: "OWDevice", parent_key: '{{ project_key }}'}, function(json) {
+            var data = JSON.parse(json);
+            data.forEach(function(el) { load_object(el); });
+
+            var need_lines = true;
+            $(document).ajaxStop(function () {
+                if (!need_lines) {
+                    return;
+                }
+                need_lines = false;
+                $.get('/cycle_objects/', {object_type: "OWConnection", parent_key: '{{ project_key }}'}, function(json2) {
+                    var reader = new draw2d.io.json.Reader();
+                    var conns = JSON.parse(json2);
+                    conns.forEach(function(el) {
+                        reader.unmarshal(canvas, el[1]["line_json"]);
+                    });
+                });
+            });
+        });
+    }
+
+    load_design();
+});
+
+function publishProject(canvas) {
+    var xCoords = [];
+    var yCoords = [];
+    canvas.getFigures().each(function(i, f) {
+        var b = f.getBoundingBox();
+        xCoords.push(b.x, b.x + b.w);
+        yCoords.push(b.y, b.y + b.h);
+    });
+    var minX = Math.min.apply(Math, xCoords);
+    var minY = Math.min.apply(Math, yCoords);
+    var width = Math.max.apply(Math, xCoords) - minX;
+    var height = Math.max.apply(Math, yCoords) - minY;
+
+    var writer = new draw2d.io.png.Writer();
+    writer.marshal(canvas, function(png) {
+        $.post('/publish_project/', {key: '{{ project_key }}', png: png}, function(data) {
+            if (data !== "OK") {
+                alert(data);
+            } else {
+                if ($("#publish").html() === "Unpublish") {
+                    $("#publish").html("Publish");
+                    $("#save").show();
+                } else {
+                    $("#publish").html("Unpublish");
+                    $("#save").hide();
+                }
+            }
+        });
+    }, new draw2d.geo.Rectangle(minX, minY, width, height));
+}
+</script>
+  </head>
+  <body>
+    <table><tr>
+        <td style="width:180px;vertical-align: top;">
+            <a class="loqc_button_2_inactive" href="#" id="save">Save</a>
+            <a class="loqc_button_2" href="#" id="delete_selection" title="Delete selection">Delete</a>
+            <a class="loqc_button_2" href="#" style="width:32px;" id="undo" title="Undo"><i class="icon-arrow-left"></i></a>
+            <a class="loqc_button_2" href="#" style="width:32px;" id="redo" title="Redo"><i class="icon-arrow-right"></i></a>
+            <a class="loqc_button_2" href="#" style="width:32px;" id="scale_minus" title="Zoom out"><i class="icon-zoom-out"></i></a>
+            <a class="loqc_button_2" href="#" style="width:32px;" id="scale_plus" title="Zoom in"><i class="icon-zoom-in"></i></a>
+            <a class="loqc_button_2" href="#" id="publish">Publish</a>
+            <a class="loqc_button_2" href="#" style="width:32px;" id="export">Export</a>
+            <a class="loqc_button_2" href="#" style="width:32px;" id="import">Import</a>
+            <hr>
+            <a class="loqc_button" href="#" id="add_in">Input (IN)</a>
+            <a class="loqc_button" href="#" id="add_q">Q-node (Q)</a>
+            <table id="controls" style="display:none;">
+                <tr><td style="width:55px;"><b>index</b></td><td><input type="number" step="1" id="index_input" value="" style="min-height:15px;width:130px;"/></td></tr>
+                <tr><td><b>angle</b></td><td><input type="number" step="any" id="angle_input" value="" style="min-height:15px;width:130px;"/> &deg;</td></tr>
+                <tr><td><b>result</b></td><td>
+                    <select id="result_input" style="min-height:15px;width:130px;">
+                        <option value="0">0</option>
+                        <option value="1">1</option>
+                    </select>
+                </td></tr>
+                <tr><td colspan="2"><a class="loqc_button_2" href="#" id="set">Set</a></td></tr>
+            </table>
+        </td>
+        <td>
+            <div onselectstart="javascript:/*IE8 hack*/return false" id="gfx_holder" style="width:2000px; height:2000px;display: block;"></div>
+        </td>
+    </tr></table>
+  </body>
+</html>

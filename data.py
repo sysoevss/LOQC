@@ -242,6 +242,22 @@ def CopyProject(project_key):
             new_conn = LOConnection(parent=new_proj.key)
             new_conn.line_json = c.line_json
             new_conn.put()
+        ow_objects = OWDevice.query(ancestor=proj.key).fetch(1000)
+        for o in ow_objects:
+            new_device = OWDevice(parent=new_proj.key)
+            new_device.id = o.id
+            new_device.type = o.type
+            new_device.index = o.index
+            new_device.angle = o.angle
+            new_device.result = o.result
+            new_device.x = o.x
+            new_device.y = o.y
+            new_device.put()
+        ow_conns = OWConnection.query(ancestor=proj.key).fetch(1000)
+        for c in ow_conns:
+            new_conn = OWConnection(parent=new_proj.key)
+            new_conn.line_json = c.line_json
+            new_conn.put()
         return 'Project is copied!'
     except Exception as ex:
         return str(ex)
@@ -257,7 +273,7 @@ def GetLibrary():
 '
 '
 '''
-object_types = ['Project', 'LODevice', 'LOConnection', 'LOCircuit']
+object_types = ['Project', 'LODevice', 'LOConnection', 'LOCircuit', 'OWDevice', 'OWConnection']
 
 @with_ndb_context
 def CallCheck(project_key=None):
@@ -427,6 +443,20 @@ class LOConnection(BaseModel):
     line_json = ndb.TextProperty()
 
 
+class OWDevice(BaseModel):
+    id = ndb.StringProperty()
+    type = ndb.StringProperty()
+    index = ndb.StringProperty()
+    angle = ndb.StringProperty()
+    result = ndb.StringProperty()
+    x = ndb.IntegerProperty(default=100)
+    y = ndb.IntegerProperty(default=100)
+
+
+class OWConnection(BaseModel):
+    line_json = ndb.TextProperty()
+
+
 class LOCircuit(BaseModel):
     name = ndb.StringProperty()
     modes = ndb.IntegerProperty()
@@ -454,6 +484,24 @@ def ClearProjectDesign(key):
             c.key.delete()
         circuit = LOCircuit.query(ancestor=proj.key).fetch(1000)
         for c in circuit:
+            c.key.delete()
+        return "OK"
+    except Exception as ex:
+        return str(ex)
+
+@with_ndb_context
+def ClearOWDesign(key):
+    try:
+        proj = Project.get(key)
+        if not proj:
+            return "No project"
+        if proj.user != current_user_email():
+            return "Not authorized"
+        objects = OWDevice.query(ancestor=proj.key).fetch(1000)
+        for o in objects:
+            o.key.delete()
+        conns = OWConnection.query(ancestor=proj.key).fetch(1000)
+        for c in conns:
             c.key.delete()
         return "OK"
     except Exception as ex:

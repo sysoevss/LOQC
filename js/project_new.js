@@ -29,31 +29,60 @@ $(document).ready(function() {
         $(this).parent().addClass("active");	
         $(".inner").hide();
         container_id = $(this).attr("id") + "_container";
-        $("#" + container_id).show();	
-	   	
+        $("#" + container_id).show();
+        syncDesignerFrames();
 	});
+
+    function syncDesignerFrames() {
+        var key = $("#current_project_key").html();
+        if (!key) {
+            key = "0";
+        }
+        $("#lo_design_frame").attr("src", "/lo_designer/?id=" + key);
+        $("#ow_design_frame").attr("src", "/ow_designer/?id=" + key);
+    }
+
+    function setCurrentProject(key, name, description) {
+        $("#current_project_key").html(key);
+        $(".current_project_key_display").html(key);
+        if (name) {
+            $("#current_project_name").html(name);
+        }
+        if (description) {
+            $("#current_project_description").html(description);
+        }
+        syncDesignerFrames();
+    }
     
     //
     //  Projects table
     //
+    function normalizeProjectKey(key) {
+        if (key.indexOf("ow_") === 0) {
+            return key.substring(3);
+        }
+        return key;
+    }
+
+    window.refreshProjectTables = function() {
+        update_table("table_myprojects", "Project", ["name", "description"], project_click, "current_user");
+        update_table("table_owmyprojects", "Project", ["name", "description"], project_click, "current_user", null, null, "ow_");
+    };
+
     function project_click(key) {
+        var projectKey = normalizeProjectKey(key);
         // show controls    
         $("#current_project").show();
         
-        // highlight table row
+        // highlight table row (both LO and OW project lists)
         $(".newspaper-a-selected").removeClass("newspaper-a-selected");
-        parent_tr = $("#" + key).parent('tr');
-        parent_tr.children().each(function() {
-            $(this).addClass("newspaper-a-selected");
-        });    
+        $("#" + projectKey).parent('tr').children().addClass("newspaper-a-selected");
+        $("#ow_" + projectKey).parent('tr').children().addClass("newspaper-a-selected");
 
         // set up environment
-		$.get('/get_object_by_key/', {object_type: "Project", key: key}, function(json) {
+		$.get('/get_object_by_key/', {object_type: "Project", key: projectKey}, function(json) {
             data = JSON.parse(json);
-            $("#current_project_name").html(data["name"]);
-            $("#current_project_description").html(data["description"]);
-            $("#current_project_key").html(key);
-            $("#lo_design_frame").attr("src", "/lo_designer/?id=" + key);
+            setCurrentProject(projectKey, data["name"], data["description"]);
 		}); 
         $("#simulate").show();
         $("#simulate_x").show();
@@ -78,6 +107,7 @@ $(document).ready(function() {
         $("#charts").hide();
     }
     init_table("table_myprojects", "Project", ["name", "description"], project_click, "current_user");
+    init_table("table_owmyprojects", "Project", ["name", "description"], project_click, "current_user", null, null, "ow_");
     
     //
     //  Various handlers
@@ -264,7 +294,7 @@ $(document).ready(function() {
     refresh_lib();
     $("#copy").click(function () {
         $.get('/copy_project/', {key: $("#lib_project_key").html()}, function(json) {
-            update_table("table_myprojects", "Project", ["name", "description"], project_click, "current_user");
+            window.refreshProjectTables();
             alert(json);
 		});     
     });

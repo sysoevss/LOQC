@@ -84,6 +84,7 @@
 
   <body>
 	<div id="all_content" style="display:none;padding-right: 2px;padding-left: 2px;">
+    <span id="current_project_key" style="display:none;"></span>
 	<!-- NAVBAR -->
     <div class="navbar navbar-inverse navbar-fixed-top">
       <div class="navbar-inner">
@@ -92,7 +93,7 @@
           <div class="nav-collapse collapse">
             <ul class="nav">
               <li class="active"><a href="#" id="composer">LO Composer</a></li>
-              <!--<li><a href="#" id="oneway">One-Way QC</a></li>-->
+              <li><a href="#" id="oneway">One-Way QC</a></li>
             </ul>
           </div>
           <a class="brand" style="position:absolute; right: 135px; opacity: 0.7;" target="_blank" href="https://www.youtube.com/playlist?list=PLoyVdGlG0wfthpwltJ5fjwStZBOhBxrtO" id="manuals">Manuals</a>
@@ -163,7 +164,7 @@
                         <td style="vertical-align: top; width:35%;display:none;" id="details_tab_container" class="top_menu_container">
                             <div style="margin: 10px 10px 10px 10px; color:#fff;">
                                 <h3> <span id="current_project_name"></span> Details </h3>
-                                <p> Project ID: <span id="current_project_key"></span> </p>
+                                <p> Project ID: <span class="current_project_key_display"></span> </p>
                                 <p> <span id="current_project_description"></span> </p>
                             </div>
                         </td>
@@ -221,9 +222,45 @@
                 </div>
             </div>
 
-			<!-- One-Way Qauntum Computing TAB -->
-			<div id="oneway_container" class="inner" style="display:none;padding:0px 0px 0px 0px;">
-                <img src="/img/coming_soon1.jpg"/>
+			<!-- One-Way Quantum Computing TAB -->
+			<div id="oneway_container" class="inner" style="display:none;">
+                <table class="newspaper-a">
+                    <tr class="success">
+                        <td id="ow_myprojects" style="width:120px;" class="loqc_menu loqc_menu_selected">My Projects</td>
+                        <td >&nbsp;</td>
+                    </tr>
+                </table>
+                <div id="ow_myprojects_div" style="width:100%;">
+                    <table style="width:100%;"><tr>
+                        <td style="vertical-align: top; width:15%;">
+                            <table class="newspaper-a" id="table_owmyprojects_envelope" style="width:100%;">
+                            <tr>
+                                <td>
+                                    <b>Name</b><input type="text" class="input-block-level" id="new_element_table_owmyprojects" value="" style="min-height:15px;width:98%"/>
+                                    <b>Description</b><br/><textarea class="input-xxlarge" id="new_element_description_table_owmyprojects" rows="3" style="width:95%;"></textarea><br/>
+                                    <a class="loqc_button" href="#" id='create_button_table_owmyprojects'>Create Project</a>
+                                    <a class="loqc_button" href="#" id='update_button_table_owmyprojects' style="display:none;">Update</a>
+                                    <a class="loqc_button" href="#" id='cancel_button_table_owmyprojects' style="display:none;">Cancel</a>
+                                    <span id="temp_table_owmyprojects" style="display:none;"></span>
+                                </td>
+                            </tr>
+                            <tr><td colspan="5">
+                                <table id="table_owmyprojects" class="newspaper-a" style="table-layout: fixed;width: 100%;">
+                                    <tbody style="display: block; overflow-y: auto; max-height: calc(100vh - 300px);"></tbody>
+                                </table>
+                            </td></tr>
+                            </table>
+                        </td>
+                        <td style="vertical-align: top;">
+                            <table class="newspaper-a" id="ow_designer_panel" style="width:100%;height:100%;">
+                                <tr><td style="width:99%;height:calc(100vh - 110px);background: linear-gradient(-0deg, #999, #bbb);padding: 0px 0px 0px 0px;">
+                                    <iframe id="ow_design_frame" src="/ow_designer/?id=0" width="100%" height="100%"></iframe>
+                                 </td>
+                                 </tr>
+                            </table>
+                        </td>
+                    </tr></table>
+                </div>
 			</div>
             
             <!-- Confirmation template -->
