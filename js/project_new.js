@@ -88,6 +88,7 @@ $(document).ready(function() {
         $("#simulate_x").show();
         $("#simulate_y").show();
         $("#simulate_z").show();
+        $("#ow_simulate").show();
         $("#matrix_refresh").show();
         $("#fidelity_refresh").show();
         $("#latex_res").html("");
@@ -102,6 +103,8 @@ $(document).ready(function() {
         $("#matrix_res").show();
         $("#fidelity_res").html("");
         $("#fidelity_res").show();
+        $("#ow_simulate_res").html("");
+        $("#ow_simulate_res").show();
         if (probChart) probChart.destroy();
         if (fidChart) fidChart.destroy();
         $("#charts").hide();
@@ -122,6 +125,18 @@ $(document).ready(function() {
             $("#latex_res").html(data);
             MathJax.typeset();
 		});     
+    });
+    $("#ow_simulate").click(function () {
+        $("#ow_simulate").hide();
+        $("#ow_simulate_res").html("");
+        $.get('/simulate_ow/', {project_key: $("#current_project_key").html()}, function(json) {
+            $("#ow_simulate").show();
+            res = JSON.parse(json);
+            $("#ow_simulate_res").html(res.data);
+            if (!res.error) {
+                MathJax.typeset();
+            }
+        });
     });
     $("#simulate_x").click(function () {
         $("#simulate_x").hide();
@@ -318,6 +333,7 @@ $(document).ready(function() {
         
         $(".top_menu_container").hide();
     });
+
     
 	// after everything is loaded, display the page
 	$("#all_content").show();       

@@ -7,6 +7,7 @@ Created on 05.04.2013
 from contextlib import contextmanager
 import datetime
 import json
+import math
 import re
 import functools
 
@@ -14,6 +15,7 @@ import users_compat as users
 from google.cloud import ndb
 
 import loqc
+import owqc
 
 def force_unicode(value):
     if isinstance(value, str):
@@ -693,6 +695,126 @@ def getDevsModes(proj):
         return devs, modes, ""
     except Exception as ex:
         return None, None, str(ex)
+
+def _parse_ow_device_index(device):
+    raw = device.index
+    if raw is None or raw == "" or str(raw) == "-1":
+        return None
+    return int(raw)
+
+
+def _ow_angle_specified(device):
+    return device.angle is not None and str(device.angle).strip() != ""
+
+
+def _ow_result_specified(device):
+    return str(device.result).strip() in ("0", "1")
+
+
+def _ow_simulation_node_index(device, n_q):
+    """Q nodes use designer index; IN nodes use Hilbert-space index after entanglement."""
+    idx = _parse_ow_device_index(device)
+    if device.type == "IN":
+        return n_q + idx
+    return idx
+
+
+def _build_ow_simulation_inputs(devices, conns):
+    by_id = {d.id: d for d in devices}
+    graph = []
+    seen_edges = set()
+    for c in conns:
+        con = json.loads(c.line_json)
+        src_id = con[0]["source"]["node"]
+        tgt_id = con[0]["target"]["node"]
+        src = by_id.get(src_id)
+        tgt = by_id.get(tgt_id)
+        if not src or not tgt:
+            continue
+        if src.type != "Q" or tgt.type != "Q":
+            continue
+        i = _parse_ow_device_index(src)
+        j = _parse_ow_device_index(tgt)
+        if i is None or j is None:
+            return None, "Each Q node in a connection must have a valid index."
+        edge = (min(i, j), max(i, j))
+        if edge not in seen_edges:
+            seen_edges.add(edge)
+            graph.append([edge[0], edge[1]])
+
+    n_q = 0
+    if graph:
+        n_q = max(max(edge) for edge in graph)
+
+    ins = []
+    observables = []
+    results = []
+    in_indices_seen = set()
+    q_indices_seen = set()
+    for d in devices:
+        idx = _parse_ow_device_index(d)
+        if idx is None:
+            continue
+        if d.type == "IN":
+            if idx in in_indices_seen:
+                return None, "Duplicate IN index: %s" % idx
+            in_indices_seen.add(idx)
+            ins.append(idx)
+        elif d.type == "Q":
+            if idx in q_indices_seen:
+                return None, "Duplicate Q index: %s" % idx
+            q_indices_seen.add(idx)
+
+        node = _ow_simulation_node_index(d, n_q)
+        if _ow_angle_specified(d):
+            angle_deg = float(d.angle)
+            angle_rad = angle_deg * math.pi / 180.0
+            observables.append([node, angle_rad])
+        if _ow_result_specified(d):
+            results.append([node, int(d.result)])
+
+    ins.sort()
+    observables.sort(key=lambda x: x[0])
+    results.sort(key=lambda x: x[0])
+    return (graph, ins, observables, results), None
+
+
+def _format_ow_vector_latex(mat):
+    import sympy as sp
+    rows = []
+    for i in range(mat.rows):
+        val = mat[i, 0]
+        try:
+            rows.append(sp.latex(val.evalf()))
+        except Exception:
+            rows.append(str(val))
+    if not rows:
+        return "\\[ \\mathbf{0} \\]"
+    body = " \\\\ ".join(rows)
+    return "\\[ \\begin{pmatrix} " + body + " \\end{pmatrix} \\]"
+
+
+@with_ndb_context
+def ConstructOWCircuit(project_key):
+    try:
+        proj = Project.get(project_key)
+        if not proj:
+            return json.dumps({"error": True, "data": "No project"})
+        user_email = current_user_email()
+        proj_user = normalize_user_value(proj.user)
+        if proj_user and proj_user != user_email:
+            return json.dumps({"error": True, "data": "Not authorized"})
+        devices = OWDevice.query(ancestor=proj.key).fetch(1000)
+        conns = OWConnection.query(ancestor=proj.key).fetch(1000)
+        inputs, error = _build_ow_simulation_inputs(devices, conns)
+        if error:
+            return json.dumps({"error": True, "data": error})
+        graph, ins, observables, results = inputs
+        vec = owqc.universal_transformation(graph, ins, observables, results)
+        return json.dumps({"error": False, "data": _format_ow_vector_latex(vec)}, default=str)
+    except Exception as ex:
+        return json.dumps({"error": True, "data": str(ex)}, default=str)
+
 
 @with_ndb_context
 def ConstructCircuit(project_key):

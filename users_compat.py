@@ -56,9 +56,10 @@ def get_current_user():
     return User(email)
 
 
-def create_login_url(dest_url="/"):
-    # In IAP, login happens at the edge. We route through /login for consistency.
-    target = dest_url or "/"
+def create_login_url(dest_url="/my"):
+    # IAP signs users in at the load balancer. Use /my (or continue target) in the UI;
+    # this URL shows an in-app help page if the IAP header is still missing.
+    target = dest_url or "/my"
     return "/login?continue=" + quote(target)
 
 

@@ -43,25 +43,42 @@ class BaseHandler(webapp2.RequestHandler):
 
 class MainPage(BaseHandler):
     def get(self):
-        #user = users.get_current_user()
-        #if not user:
+        user = users.get_current_user()
+        if user:
+            # IAP often returns here after sign-in (/) instead of /my.
+            continue_to = self.request.get('continue')
+            if continue_to and continue_to.startswith('/') and not continue_to.startswith('//'):
+                self.redirect(continue_to)
+            else:
+                self.redirect('/my')
+            return
         template_values = {
             'isAdmin': False
         }
         self.response.write(_render_template('main.html', template_values))
-        #else:
-        #    self.redirect('/my')
-        #    return 
 
 class LoginPage(BaseHandler):
     def get(self):
-        user = users.get_current_user()
-        if not user:
-            self.redirect('/my')
-            return
         continue_to = self.request.get('continue') or '/my'
-        self.redirect(continue_to)
-        return
+        user = users.get_current_user()
+        if user:
+            self.redirect(continue_to)
+            return
+        # Reached the app without an IAP identity header (see users_compat.py).
+        self.response.status_int = 401
+        self.response.write(
+            '<html><body style="font-family:sans-serif;max-width:42em;margin:2em;">'
+            '<h1>Sign-in required</h1>'
+            '<p>Your Google account is not attached to this request. With Identity-Aware Proxy, '
+            'open the app via the deployed URL (for example <a href="/my">/my</a>) so Google sign-in '
+            'runs at the load balancer.</p>'
+            '<p>If you already signed in and still see IAP &ldquo;You don&rsquo;t have access&rdquo;, '
+            'that page comes from <b>Google Cloud IAP</b>, not this app. Check IAP is enabled on the '
+            'same hostname you use, and that <code>allAuthenticatedUsers</code> has role '
+            '<code>IAP-secured Web App User</code> on that exact App Engine resource.</p>'
+            '<p><a href="/my">Continue to My Projects</a></p>'
+            '</body></html>'
+        )
 
 class LogoutPage(BaseHandler):
     def get(self):
@@ -78,12 +95,10 @@ class ProjectsPage(BaseHandler):
     def get(self):
         user = users.get_current_user()
         if not user:
-            login_page = users.create_login_url('/')
-            self.redirect(login_page)
-            return         
-        else:
-            template_values = {}
-            self.response.write(_render_template('projects.html', template_values))
+            self.redirect('/login?continue=' + urllib.parse.quote('/my'))
+            return
+        template_values = {}
+        self.response.write(_render_template('projects.html', template_values))
 
 
 #
@@ -159,6 +174,10 @@ class Simulate(BaseHandler):
     def get(self):
         project_key = self.request.get('project_key')
         self.response.write(data.ConstructCircuit(project_key))
+class SimulateOW(BaseHandler):
+    def get(self):
+        project_key = self.request.get('project_key')
+        self.response.write(data.ConstructOWCircuit(project_key))
 class SimulateCGate(BaseHandler):
     def get(self):
         project_key = self.request.get('project_key')
@@ -215,6 +234,7 @@ application = webapp2.WSGIApplication([('/', MainPage),
                                        ('/clear_design/', ClearDesign),
                                        ('/clear_ow_design/', ClearOWDesign),
                                        ('/simulate/', Simulate),
+                                       ('/simulate_ow/', SimulateOW),
                                        ('/simulate_cgate/', SimulateCGate),
                                        ('/publish_project/', PublishProject),
                                        ('/copy_project/', CopyProject),

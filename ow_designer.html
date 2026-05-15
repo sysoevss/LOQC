@@ -84,6 +84,45 @@ body {
 var canvas;
 var cur_figure;
 var FIGURE_TYPES = ["IN", "Q"];
+var nextInIndex = 1;
+var nextQIndex = 1;
+var OW_UNSET = "";
+
+function allocateInIndex() {
+    return nextInIndex++;
+}
+
+function allocateQIndex() {
+    return nextQIndex++;
+}
+
+function reseedIndexCounters() {
+    nextInIndex = 1;
+    nextQIndex = 1;
+    canvas.figures.data.forEach(function(fig) {
+        if (FIGURE_TYPES.indexOf(fig.type) < 0) {
+            return;
+        }
+        var idx = parseInt(fig.index, 10);
+        if (isNaN(idx) || idx < 1) {
+            return;
+        }
+        if (fig.type === "IN" && idx >= nextInIndex) {
+            nextInIndex = idx + 1;
+        }
+        if (fig.type === "Q" && idx >= nextQIndex) {
+            nextQIndex = idx + 1;
+        }
+    });
+}
+
+function isAngleSpecified(fig) {
+    return fig.angle !== null && fig.angle !== "" && typeof fig.angle !== "undefined";
+}
+
+function isResultSpecified(fig) {
+    return fig.result === "0" || fig.result === "1";
+}
 
 function download(data, filename) {
     var file = new Blob([data], {type: 'text/plain'});
@@ -131,17 +170,60 @@ function resolveClickedFigure(figure) {
     return null;
 }
 
-function setupUnlimitedConnections(figure) {
-    var port = figure.createPort("hybrid", new draw2d.layout.locator.CenterLocator());
+// IN triangle vertices: (0,0), (width, height/2), (0, height)
+var OwTriangleVertexPortLocator = draw2d.layout.locator.PortLocator.extend({
+    init: function(vertex) {
+        this._super();
+        this.vertex = vertex;
+    },
+    relocate: function(index, figure) {
+        var p = figure.getParent();
+        var w = p.getWidth();
+        var h = p.getHeight();
+        var x = 0;
+        var y = 0;
+        if (this.vertex === 0) {
+            x = 0;
+            y = 0;
+        } else if (this.vertex === 1) {
+            x = w;
+            y = h / 2;
+        } else {
+            x = 0;
+            y = h;
+        }
+        this.applyConsiderRotation(figure, x, y);
+    }
+});
+
+function addOwPort(figure, locator) {
+    var port = figure.createPort("hybrid", locator);
     port.setMaxFanOut(Number.MAX_SAFE_INTEGER);
-    port.setConnectionAnchor(new draw2d.layout.anchor.ShortesPathConnectionAnchor(port));
-    port.setVisible(false);
-    port.setVisible = function () {};
-    figure.delegateTarget = function (draggedFigure) {
-        return port.delegateTarget(draggedFigure);
-    };
-    figure.graphPort = port;
+    port.setBackgroundColor("#129ce4");
+    port.setColor("#0a6fad");
     return port;
+}
+
+function setupInConnections(figure) {
+    figure.connectionPorts = [
+        addOwPort(figure, new OwTriangleVertexPortLocator(0)),
+        addOwPort(figure, new OwTriangleVertexPortLocator(1)),
+        addOwPort(figure, new OwTriangleVertexPortLocator(2))
+    ];
+}
+
+function setupQConnections(figure) {
+    figure.connectionPorts = [
+        addOwPort(figure, new draw2d.layout.locator.TopLocator()),
+        addOwPort(figure, new draw2d.layout.locator.RightLocator()),
+        addOwPort(figure, new draw2d.layout.locator.BottomLocator()),
+        addOwPort(figure, new draw2d.layout.locator.LeftLocator())
+    ];
+}
+
+function decorateNodeLabel(label) {
+    label.setSelectable(false);
+    label.setDraggable(false);
 }
 
 function formatIndexLabel(index) {
@@ -152,12 +234,17 @@ function formatIndexLabel(index) {
 }
 
 function updateFigureLabel(fig) {
-    var idxText = formatIndexLabel(fig["index"]);
-    var ang = parseFloat(fig["angle"]);
-    if (isNaN(ang)) {
-        ang = 0;
+    var lines = [String(formatIndexLabel(fig["index"]))];
+    if (isAngleSpecified(fig)) {
+        var ang = parseFloat(fig["angle"]);
+        if (!isNaN(ang)) {
+            lines.push(ang.toFixed(1) + "\u00b0");
+        }
     }
-    fig.label.text = idxText + "\n" + ang.toFixed(1) + "\u00b0\n" + fig["result"];
+    if (isResultSpecified(fig)) {
+        lines.push(String(fig["result"]));
+    }
+    fig.label.text = lines.join("\n");
     fig.label.repaint();
 }
 
@@ -169,8 +256,8 @@ function showFigureControls(fig) {
     } else {
         $("#index_input").val(parseInt(fig["index"], 10));
     }
-    $("#angle_input").val(parseFloat(fig["angle"]));
-    $("#result_input").val(String(fig["result"]));
+    $("#angle_input").val(isAngleSpecified(fig) ? parseFloat(fig["angle"]) : "");
+    $("#result_input").val(isResultSpecified(fig) ? String(fig["result"]) : "");
 }
 
 InputFigure = draw2d.shape.basic.Polygon.extend({
@@ -241,7 +328,7 @@ document.addEventListener("DOMContentLoaded", function () {
     }));
 
     function add_in(x, y, index, angle, result, id) {
-        var d = new InputFigure({x: x, y: y, width: 50, height: 50});
+        var d = new InputFigure({x: x, y: y, width: 100, height: 100});
         d["type"] = "IN";
         d["index"] = index;
         d["angle"] = angle;
@@ -250,14 +337,15 @@ document.addEventListener("DOMContentLoaded", function () {
             d["id"] = id;
         }
         d.label = new draw2d.shape.basic.Label({text: "", fontColor: "#0d0d0d", stroke: 0});
+        decorateNodeLabel(d.label);
         d.add(d.label, new draw2d.layout.locator.CenterLocator(d));
-        setupUnlimitedConnections(d);
+        setupInConnections(d);
         updateFigureLabel(d);
         canvas.add(d);
     }
 
     function add_q(x, y, index, angle, result, id) {
-        var d = new draw2d.shape.basic.Oval({x: x, y: y, width: 50, height: 50});
+        var d = new draw2d.shape.basic.Oval({x: x, y: y, width: 100, height: 100});
         d.setBackgroundColor({red: 255, green: 200, blue: 120, alpha: 0.6});
         d.setColor("#1B1B1B");
         d["type"] = "Q";
@@ -268,20 +356,21 @@ document.addEventListener("DOMContentLoaded", function () {
             d["id"] = id;
         }
         d.label = new draw2d.shape.basic.Label({text: "", fontColor: "#0d0d0d", stroke: 0});
+        decorateNodeLabel(d.label);
         d.add(d.label, new draw2d.layout.locator.CenterLocator(d));
-        setupUnlimitedConnections(d);
+        setupQConnections(d);
         updateFigureLabel(d);
         canvas.add(d);
     }
 
     $("#add_in").click(function(e) {
         e.preventDefault();
-        add_in(100, 100, 0, 0.0, "0", null);
+        add_in(100, 100, allocateInIndex(), OW_UNSET, OW_UNSET, null);
         markUnsaved();
     });
     $("#add_q").click(function(e) {
         e.preventDefault();
-        add_q(100, 100, 0, 0.0, "0", null);
+        add_q(100, 100, allocateQIndex(), OW_UNSET, OW_UNSET, null);
         markUnsaved();
     });
 
@@ -402,8 +491,10 @@ document.addEventListener("DOMContentLoaded", function () {
         } else {
             cur_figure["index"] = parseInt(index_val, 10);
         }
-        cur_figure["angle"] = $("#angle_input").val();
-        cur_figure["result"] = $("#result_input").val();
+        var angle_val = $("#angle_input").val();
+        cur_figure["angle"] = (angle_val === "") ? OW_UNSET : angle_val;
+        var result_val = $("#result_input").val();
+        cur_figure["result"] = (result_val === "") ? OW_UNSET : result_val;
         updateFigureLabel(cur_figure);
     });
 
@@ -442,13 +533,16 @@ document.addEventListener("DOMContentLoaded", function () {
         } else {
             index = parseInt(index, 10);
         }
-        var angle = parseFloat(obj.angle);
-        if (isNaN(angle)) {
-            angle = 0.0;
+        var angle = OW_UNSET;
+        if (obj.angle !== null && obj.angle !== "" && typeof obj.angle !== "undefined") {
+            var parsed_angle = parseFloat(obj.angle);
+            if (!isNaN(parsed_angle)) {
+                angle = String(parsed_angle);
+            }
         }
-        var result = String(obj.result);
-        if (result !== "0" && result !== "1") {
-            result = "0";
+        var result = OW_UNSET;
+        if (obj.result === "0" || obj.result === "1") {
+            result = String(obj.result);
         }
         return {index: index, angle: angle, result: result};
     }
@@ -456,6 +550,14 @@ document.addEventListener("DOMContentLoaded", function () {
     function load_object(el) {
         var obj = el[1];
         var params = parseLoadedParams(obj);
+        if (params.index < 1) {
+            if (obj.type === "IN") {
+                params.index = allocateInIndex();
+            }
+            if (obj.type === "Q") {
+                params.index = allocateQIndex();
+            }
+        }
         if (obj.type === "IN") {
             add_in(obj.x, obj.y, params.index, params.angle, params.result, obj.id);
         }
@@ -488,6 +590,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     conns.forEach(function(el) {
                         reader.unmarshal(canvas, el[1]["line_json"]);
                     });
+                    reseedIndexCounters();
                 });
             });
         });
@@ -548,6 +651,7 @@ function publishProject(canvas) {
                 <tr><td><b>angle</b></td><td><input type="number" step="any" id="angle_input" value="" style="min-height:15px;width:130px;"/> &deg;</td></tr>
                 <tr><td><b>result</b></td><td>
                     <select id="result_input" style="min-height:15px;width:130px;">
+                        <option value="">—</option>
                         <option value="0">0</option>
                         <option value="1">1</option>
                     </select>
